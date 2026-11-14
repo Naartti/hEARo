@@ -20,7 +20,7 @@ locally; pin actions by commit SHA (the hygiene check enforces it).
 | When | Run | What it covers |
 |---|---|---|
 | Before **every** commit | `just check` (≈5 s warm, < 60 s) | rustfmt, clippy `-D warnings`, all fast Rust tests (incl. property, RT-safety, and a stress test simulating 10 min of audio in < 1 s), Swift build + tests, ruff + pytest, repo hygiene |
-| Before every push, at **milestone end**, after any dependency/toolchain bump, after touching `deny.toml`/`justfile`/`scripts/` | `just ci` | `check` + golden tests + doc tests + CPU budgets (release) + cargo-deny + cargo-machete + XcodeGen spec + markdownlint + offline link check. Log: `target/ci/last.log` |
+| Before every push, at **milestone end**, after any dependency/toolchain bump, after touching `deny.toml`/`justfile`/`scripts/` | `just ci` | `check` + golden tests + doc tests + CPU budgets (release) + cargo-deny + cargo-machete + XcodeGen spec + actionlint + markdownlint + offline link check. Log: `target/ci/last.log` |
 | After touching DSP module code | `just test-golden`, `just bench` | measurable quality thresholds; CPU budget per block (local only: hosted runners skip budgets) |
 | Optional, after adding tests | `just coverage` | Rust line coverage → `target/coverage/html/index.html` (CI uploads it to Codecov) |
 | Docs-only change | `just docs` | lint + links |

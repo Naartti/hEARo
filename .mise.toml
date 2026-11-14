@@ -12,6 +12,8 @@ cargo-deny = "0.20.2"
 "cargo:cargo-llvm-cov" = "0.9.1"
 xcodegen = "2.46.0"
 lychee = "0.24.2"
+actionlint = "1.7.12"
+shellcheck = "0.11.0"
 "npm:markdownlint-cli2" = "0.24.1"
 
 [settings]

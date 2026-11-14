@@ -18,7 +18,8 @@ pytest (fast), repo hygiene on staged files.
 
 `just ci` adds: golden audio tests, doc tests, benchmarks compile, CPU budgets (release build), cargo-deny
 (licenses/advisories/sources), cargo-machete (unused deps), XcodeGen spec generation,
-markdownlint, offline link check, hygiene over all tracked files. Output is tee'd to
+actionlint (workflow syntax, expressions and shellcheck of `run:` blocks), markdownlint,
+offline link check, hygiene over all tracked files. Output is tee'd to
 `target/ci/last.log`. Each step reports ✔/✘ with timing; all steps run even if one fails, and
 the summary lists failures.
 
@@ -47,13 +48,17 @@ not measured yet.
 
 ## Releasing
 
-Bump the version (the `release` skill has the checklist), merge to `main`, then tag:
-`git tag v0.2.0 && git push origin v0.2.0`. `release.yml` checks the tag matches `Cargo.toml`,
-builds with `scripts/build-app.sh release`, signs **ad-hoc** (`ALLOW_ADHOC=1 SIGN_IDENTITY=-`),
-packages `hEARo-<version>.dmg`, writes a `.sha256`, attests build provenance and publishes the
-GitHub Release with generated notes (`.github/release.yml` groups them by label). Ad-hoc keeps
-the personal signing certificate, which carries the owner's name, out of public binaries.
-`just release` still builds a personally signed DMG for your own Macs; don't upload that one.
+Bump the version (the `release` skill has the checklist), merge to `main`, wait for CI on
+`main` to go green, then tag: `git tag v0.2.0 && git push origin v0.2.0`. `release.yml`'s
+read-only **build** job refuses a tag that doesn't match `Cargo.toml`, isn't on `main` or has no
+successful CI run, then builds with `scripts/build-app.sh release`, signs **ad-hoc**
+(`ALLOW_ADHOC=1 SIGN_IDENTITY=-`), packages `hEARo-<version>.dmg` and writes a `.sha256`. Only
+the **publish** job (tags only) gets write permissions: it attests build provenance and
+creates the GitHub Release with generated notes (`.github/release.yml` groups them by label).
+A pre-release version (`0.2.0-rc.1`) becomes a GitHub pre-release and never "latest". Ad-hoc
+keeps the personal signing certificate, which carries the owner's name, out of public
+binaries. `just release` still builds a personally signed DMG for your own Macs; don't upload
+that one.
 
 ## Hooks (lefthook)
 

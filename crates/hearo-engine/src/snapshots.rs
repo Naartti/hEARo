@@ -281,8 +281,14 @@ pub fn save_auto(
 }
 
 /// Unix times of the auto-saved clips in `dir` (from their file names; no file reads).
+/// Copies imported from another Mac (`-importedN`) aren't this Mac's saves and don't count.
 pub fn auto_save_times(dir: &Path) -> Vec<u64> {
-    list(dir).iter().filter_map(|s| auto_save_time(s)).collect()
+    list(dir).iter().filter(|s| !s.contains("-imported")).filter_map(|s| auto_save_time(s)).collect()
+}
+
+/// Whether a snapshot stem is an auto-saved clip (`snapshot-<unix>-auto[-n][-importedN]`).
+pub fn is_auto(stem: &str) -> bool {
+    auto_save_time(stem).is_some()
 }
 
 /// Delete auto-saved clips older than `max_age_days` that were never touched in the review window
@@ -298,10 +304,16 @@ pub fn expire_auto(dir: &Path, max_age_days: u32, now_unix: u64) -> usize {
             continue;
         }
         let json = dir.join(format!("{stem}.json"));
-        let side: serde_json::Value =
-            std::fs::read_to_string(&json).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+        // A missing or unreadable sidecar might hold labels we can't see: keep the clip.
+        let Some(side) = std::fs::read_to_string(&json)
+            .ok()
+            .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+            .filter(serde_json::Value::is_object)
+        else {
+            continue;
+        };
         let nonempty = |k: &str| side[k].as_array().is_some_and(|a| !a.is_empty());
-        if side["reviewed"] == true || nonempty("regions") || nonempty("rejected") {
+        if side["reviewed"] != false && !side["reviewed"].is_null() || nonempty("regions") || nonempty("rejected") {
             continue;
         }
         let wav = dir.join(format!("{stem}.wav"));
@@ -462,6 +474,48 @@ mod tests {
         let deleted = std::fs::read_to_string(dir.join(DELETED_FILE)).unwrap();
         assert_eq!(deleted.lines().count(), 2, "recorded so an import won't resurrect them");
         assert_eq!(expire_auto(&dir, 31, now), 0, "idempotent");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn auto_stems_and_cap_seeding() {
+        for (stem, auto) in [
+            ("snapshot-5-auto", true),
+            ("snapshot-5-auto-2", true),
+            ("snapshot-5-auto-imported3", true),
+            ("snapshot-5-automatic", false),
+            ("snapshot-x-auto", false),
+            ("snapshot-5-missed", false),
+        ] {
+            assert_eq!(is_auto(stem), auto, "{stem}");
+        }
+        let dir = std::env::temp_dir().join(format!("hearo-seed-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for s in ["snapshot-5-auto", "snapshot-6-auto-2", "snapshot-7-auto-imported2", "snapshot-8-missed"] {
+            std::fs::write(dir.join(format!("{s}.wav")), b"x").unwrap();
+        }
+        let mut t = auto_save_times(&dir);
+        t.sort_unstable();
+        assert_eq!(t, vec![5, 6], "imported copies don't use up this Mac's daily limit");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A clip whose sidecar is missing, corrupt or not an object might hold labels: kept.
+    #[test]
+    fn expiry_keeps_clips_with_unreadable_sidecars() {
+        let dir = std::env::temp_dir().join(format!("hearo-expire-bad-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for (i, json) in [None, Some("{"), Some("[]"), Some(r#"{"reviewed":"yes"}"#)].iter().enumerate() {
+            let stem = format!("snapshot-{}-auto", 100 + i);
+            std::fs::write(dir.join(format!("{stem}.wav")), b"RIFF").unwrap();
+            if let Some(j) = json {
+                std::fs::write(dir.join(format!("{stem}.json")), j).unwrap();
+            }
+        }
+        assert_eq!(expire_auto(&dir, 1, 100 * 86_400), 0);
+        assert_eq!(list(&dir).len(), 4);
         std::fs::remove_dir_all(dir).unwrap();
     }
 

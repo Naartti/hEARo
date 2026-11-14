@@ -77,7 +77,7 @@ fn propose(dir: &std::path::Path, dry_run: bool, keys: &[String]) -> Result<()> 
     for stem in &stems {
         // Auto-saved clips already carry the live detector's proposals, and the review window's
         // accept/false-positive decisions match their exact spans: never overwrite them.
-        if stem.split('-').nth(2) == Some("auto") {
+        if snapshots::is_auto(stem) {
             continue;
         }
         let wav = hearo_testkit::wav::read(dir.join(format!("{stem}.wav")))?;

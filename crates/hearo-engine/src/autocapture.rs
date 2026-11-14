@@ -140,7 +140,9 @@ impl AutoCapture {
                 continue;
             }
             let end = b.last_end + post;
-            return Some(DueClip { start: end.saturating_sub(frames as u64), frames, catches: b.catches });
+            let start = end.saturating_sub(frames as u64);
+            // Shorter than 8 s right after a start/rebuild: only what the ring has.
+            return Some(DueClip { start, frames: (end - start) as usize, catches: b.catches });
         }
         None
     }
@@ -235,6 +237,25 @@ mod tests {
         assert!(ac.due(at(30.0), SR, 2, now + DAY_S).is_some());
         ac.saved(now + DAY_S);
         assert_eq!(ac.saved_last_24h(now + DAY_S), 1);
+    }
+
+    /// Right after a start or a rebuild the ring holds less than 8 s: the clip is shorter
+    /// instead of being cut from frames that don't exist (review: it used to vanish).
+    #[test]
+    fn a_catch_in_the_first_seconds_gets_a_shorter_clip() {
+        let mut ac = AutoCapture::new(vec![]);
+        ac.observe(&[catch(1.0)], SR);
+        let clip = ac.due(at(4.1), SR, 250, 0).expect("due");
+        assert_eq!(clip.start, 0);
+        assert_eq!(clip.frames as u64, at(1.02) + at(3.0));
+        assert!((clip.proposals(SR)[0].start_s - 1.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn cap_boundary_is_exactly_24_h() {
+        let now = 1_000_000;
+        let mut ac = AutoCapture::new(vec![now - DAY_S, now - DAY_S + 1]);
+        assert_eq!(ac.saved_last_24h(now), 1, "a save exactly 24 h old no longer counts");
     }
 
     #[test]

@@ -172,11 +172,11 @@ struct AppModelTests {
 @MainActor
 struct AppMenuTests {
     @Test func sameEntriesWithAboutFirstAndQuitLast() {
-        let menu = AppMenu(model: AppModel(engine: FakeEngine(.previewRunning)), openReview: {})
-        #expect(menu.items == [.about, .divider, .review, .advanced, .divider, .export, .import, .showInFinder, .divider, .quit])
+        let menu = AppMenu(model: AppModel(engine: FakeEngine(.previewRunning)), show: { _ in })
+        #expect(menu.items == [.about, .divider, .window, .review, .advanced, .divider, .export, .import, .showInFinder, .divider, .quit])
         #expect(menu.nsMenu().items.map(\.title) == [
-            "About hEARo", "", "Review snapshots…", "Advanced settings…", "", "Export snapshots…", "Import snapshots…",
-            "Show snapshots in Finder", "", "Quit hEARo",
+            "About hEARo", "", "Open hEARo Window", "Review snapshots…", "Advanced settings…", "", "Export snapshots…",
+            "Import snapshots…", "Show snapshots in Finder", "", "Quit hEARo",
         ])
         #expect(menu.nsMenu().items.first?.keyEquivalent == "")
         #expect(menu.nsMenu().items.last?.keyEquivalent == "q")
@@ -200,17 +200,14 @@ struct AppMenuTests {
         #expect(credits.contains("never sent anywhere"))
     }
 
-    @Test func reviewRunsTheOpenAction() {
-        var opened = false
-        AppMenu(model: AppModel(engine: FakeEngine(.previewRunning)), openReview: { opened = true }).perform(.review)
-        #expect(opened)
-    }
-
-    @Test func advancedOpensTheSettingsWindow() {
-        var opened = false
-        let menu = AppMenu(model: AppModel(engine: FakeEngine(.previewRunning)), openReview: {}, openSettings: { opened = true })
+    /// Window, Review and Advanced all open the one hEARo window, each on its own tab.
+    @Test func windowEntriesOpenTheMainWindowOnTheirTab() {
+        var shown: [MainTab] = []
+        let menu = AppMenu(model: AppModel(engine: FakeEngine(.previewRunning)), show: { shown.append($0) })
+        menu.perform(.window)
+        menu.perform(.review)
         menu.perform(.advanced)
-        #expect(opened)
+        #expect(shown == [.controls, .review, .settings])
         #expect(AppMenu.Item.advanced.title == "Advanced settings…")
     }
 }

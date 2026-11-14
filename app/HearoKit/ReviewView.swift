@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// The snapshot review & annotation window (M6): clip list on the left, the timeline editor
+/// The snapshot review & annotation view (M6), the hEARo window's Review tab: clip list on the left, the timeline editor
 /// (waveform + optional spectrogram, `ReviewTimeline.swift`) in the middle, the processing
 /// inspector (`ReviewInspector.swift`) on the right. Keyboard: Space play/pause (clip under the
 /// mouse), 1–6 region class, ⌫ delete region, ⌘⌫ move clip to Trash, ↑/↓ previous/next clip,
@@ -109,7 +109,6 @@ public struct ReviewView: View {
             model.inspector?.windowAppeared()
             model.reload()
             focused = true
-            NSApp.activate()
         }
         .onDisappear {
             model.player?.stop()

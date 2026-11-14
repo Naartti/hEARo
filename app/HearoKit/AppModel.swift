@@ -70,6 +70,10 @@ public final class AppModel {
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var waveTimer: Timer?
     @ObservationIgnored private var waveCursor: UInt64 = 0
+    /// Live views currently on screen (the popover, the window's Controls tab).
+    @ObservationIgnored private var liveViewers: Set<LiveViewer> = []
+    /// The hEARo window's selected tab (`MainWindowView`).
+    public var mainTab: MainTab = .controls
     /// The popover's live waveform (≈ 3 s at 60 columns/s).
     public private(set) var waveform = WaveformBuffer(capacity: 180)
     /// Module on/off and parameter values (amount sliders, Advanced settings), saved to
@@ -131,17 +135,28 @@ public final class AppModel {
         if !chunk.peaks.isEmpty { waveform.append(chunk) }
     }
 
-    /// Start/stop the waveform poll with the popover (no UI work while it's closed). Under
-    /// Reduce Motion the waveform updates 10×/s in chunks instead of scrolling smoothly.
-    public func setPopoverVisible(_ visible: Bool, reduceMotion: Bool = false) {
+    /// Start/stop the waveform poll with the live views (no UI work while none is on screen):
+    /// it runs while the popover *or* the window's Controls tab is visible. Under Reduce Motion
+    /// the waveform updates 10×/s in chunks instead of scrolling smoothly.
+    public func setLiveViewVisible(_ visible: Bool, viewer: LiveViewer, reduceMotion: Bool = false) {
+        if visible { liveViewers.insert(viewer) } else { liveViewers.remove(viewer) }
+        guard !liveViewers.isEmpty else {
+            waveTimer?.invalidate()
+            waveTimer = nil
+            return
+        }
+        guard visible else { return }  // another view is still showing; keep its timer
         waveTimer?.invalidate()
-        waveTimer = nil
-        guard visible else { return }
         pollWaveform()
         waveTimer = Timer.scheduledTimer(withTimeInterval: reduceMotion ? 0.1 : 1.0 / 30, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.pollWaveform() }
         }
     }
+
+    var isPollingWaveform: Bool { waveTimer != nil }
+
+    /// Select a tab of the hEARo window (the caller opens the window).
+    public func show(_ tab: MainTab) { mainTab = tab }
 
     public var isOn: Bool { snapshot.running }
 

@@ -1,15 +1,18 @@
 import SwiftUI
 
-/// Scene id of the snapshot review window (`Window(..., id:)` in the app).
-public let reviewWindowID = "review"
-
-/// The menu bar popover (§13.3). M0 shell: header, master switch, modules, footer.
-public struct PopoverView: View {
+/// The controls (§13.3): header, master switch, live waveform, modules, footer. Shown in the
+/// menu bar popover and, to keep it open while testing, in the hEARo window's Controls tab.
+public struct ControlsView: View {
     @Bindable var model: AppModel
+    /// Where it is shown: the popover (closes on any click elsewhere) or the window.
+    let viewer: LiveViewer
     @Environment(\.openWindow) private var openWindow
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    public init(model: AppModel) { self.model = model }
+    public init(model: AppModel, viewer: LiveViewer = .popover) {
+        self.model = model
+        self.viewer = viewer
+    }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -41,9 +44,9 @@ public struct PopoverView: View {
         }
         .padding(14)
         .frame(width: 360)
-        .onAppear { model.setPopoverVisible(true, reduceMotion: reduceMotion) }
-        .onChange(of: reduceMotion) { _, on in model.setPopoverVisible(true, reduceMotion: on) }
-        .onDisappear { model.setPopoverVisible(false) }
+        .onAppear { model.setLiveViewVisible(true, viewer: viewer, reduceMotion: reduceMotion) }
+        .onChange(of: reduceMotion) { _, on in model.setLiveViewVisible(true, viewer: viewer, reduceMotion: on) }
+        .onDisappear { model.setLiveViewVisible(false, viewer: viewer) }
     }
 
     private var header: some View {
@@ -65,6 +68,16 @@ public struct PopoverView: View {
                 }
             }
             Spacer()
+            if viewer == .popover {
+                Button {
+                    show(.controls)
+                } label: {
+                    Image(systemName: "macwindow")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Open in a window")
+                .help("Open these controls in the hEARo window, which stays open")
+            }
             Toggle("Processing", isOn: Binding(get: { model.isOn }, set: { model.setOn($0) }))
                 .toggleStyle(.switch)
                 .labelsHidden()
@@ -133,9 +146,11 @@ public struct PopoverView: View {
         }
     }
 
-    private func openAdvanced() {
-        openWindow(id: settingsWindowID)
-        NSApp?.activate()
+    private func openAdvanced() { show(.settings) }
+
+    /// In the window, switch tabs; from the popover, open the window on that tab.
+    private func show(_ tab: MainTab) {
+        if viewer == .window { model.show(tab) } else { model.openMainWindow(tab, using: openWindow) }
     }
 
     private var footer: some View {
@@ -150,21 +165,18 @@ public struct PopoverView: View {
     }
 }
 
-extension PopoverView {
+extension ControlsView {
     /// ⋯ menu: the same entries as the right-click menu on the menu bar icon (incl. Quit, ⌘Q).
     var moreMenu: some View {
         Menu {
-            AppMenu(
-                model: model, openReview: { openWindow(id: reviewWindowID) },
-                openSettings: { openWindow(id: settingsWindowID) }
-            ).swiftUIContent
+            AppMenu(model: model, show: show).swiftUIContent
         } label: {
             Image(systemName: "ellipsis.circle")
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
         .accessibilityLabel("More")
-        .help("Review, export/import snapshots, quit (also on right-click of the menu bar icon)")
+        .help("Window, review, export/import snapshots, quit (also on right-click of the menu bar icon)")
     }
 }
 
@@ -189,11 +201,11 @@ struct PermissionDeniedView: View {
 
 // PreviewProvider rather than #Preview: the #Preview macro plugin ships only with Xcode, and this
 // file must also compile with Command Line Tools (`swift build`). Xcode still shows these.
-struct PopoverView_Previews: PreviewProvider {
+struct ControlsView_Previews: PreviewProvider {
     static var previews: some View {
-        PopoverView(model: AppModel(engine: FakeEngine(.previewRunning)))
+        ControlsView(model: AppModel(engine: FakeEngine(.previewRunning)))
             .previewDisplayName("Running")
-        PopoverView(model: AppModel(engine: FakeEngine(.previewDenied)))
+        ControlsView(model: AppModel(engine: FakeEngine(.previewDenied)))
             .previewDisplayName("Permission denied")
     }
 }

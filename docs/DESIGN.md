@@ -9,6 +9,9 @@ file records decisions and the current state.
 - Show, don't hide, what processing does — the visualizer is a core feature.
 - Accessible: VoiceOver labels on every control and meter, keyboard navigation, Reduce Motion.
 - Cheap: no telemetry polling while the popover/visualizer is hidden (< 0.5% CPU idle UI).
+- **One window** (human request 2026-11-14): everything bigger than the popover lives in the
+  single hEARo window as a toolbar tab, never in another window. Anything the popover shows can
+  also be kept open there — the popover vanishes on any click, which is useless while testing.
 
 ## Menu bar icon
 
@@ -31,6 +34,34 @@ file records decisions and the current state.
   trigger counters in the polled status (no extra audio-thread work). Under Reduce Motion: no
   glow animation, just a static accent fill for the same duration.
 
+## The hEARo window (human request 2026-11-14)
+
+"Merge advanced settings and review snapshot so they are the same window but different tabs,
+something that looks native. Also the popover as a view there to keep it open — handy for
+validation and testing."
+
+- One `Window("hEARo", id: "main")` (`HearoKit/MainWindow.swift`) replaces the separate
+  Review snapshots and Advanced Settings windows. Tabs **Controls · Review · Settings** as a
+  segmented control in the toolbar (the Activity Monitor pattern; a sidebar would sit next to
+  Review's own clip list), **⌘1–⌘3** switch (hidden buttons — an LSUIElement app has no View
+  menu). The window title is "hEARo".
+- **Controls** is the popover's content (`ControlsView`, same 360 pt column) — it stays open
+  until the window is closed. The popover header has a window button (`macwindow`, "Open in a
+  window") that opens it on this tab. The live waveform polls while the popover *or* this tab
+  is on screen (`AppModel.setLiveViewVisible`, reference-counted per view).
+- Opening: popover window button → Controls; "Advanced…" link and ⋯ / right-click
+  "Advanced settings…" → Settings; "Review snapshots…" → Review; new menu entry **Open hEARo
+  Window** → Controls. Every route activates the app (menu-bar-only apps otherwise open
+  windows behind the frontmost app). In the window, "Advanced…" just switches tabs.
+- **Sizing:** opens at 1300 × 680 (Review's size); the window grows to each tab's minimum
+  (Review 820/1100 pt with the inspector) and doesn't shrink back. Settings keeps a 680 pt
+  column centred so sliders don't stretch across a wide window.
+- **Switching away from Review** is like closing its window used to be: playback stops and
+  renders/spectrograms are dropped (re-rendered in ≈ 80 ms on return); the open clip, viewport
+  and trial settings stay.
+- Follow-up: the Controls tab keeps polling the waveform while the window is minimised or
+  hidden behind other windows (only closing it or switching tabs stops it).
+
 ## Popover (360 pt wide) — current state
 
 | Section | Status |
@@ -40,14 +71,14 @@ file records decisions and the current state.
 | Full visualizer (spectrum, removed-energy colours) | M5 |
 | Modules: colour swatch (the legend), toggle, name, trigger count; under each name an **amount slider** for the module's primary parameter; "Advanced…" link | done (human request 2026-11-14), see *Module settings* |
 | Sources: apps producing audio with include/exclude | M3 |
-| Labeling hints + Review… | Review window done (⋯ → "Review snapshots…"); hints M6 |
+| Labeling hints + Review… | Review tab of the hEARo window (⋯ → "Review snapshots…"); hints M6 |
 | Footer: Settings…, Visualizer…, Quit | ⋯ menu: About hEARo / Review / Advanced settings / Export / Import / Show in Finder / Launch at login / **Quit (⌘Q)**; the **same menu on right-click** of the menu bar icon (`HearoKit/AppMenu.swift`, human request 2026-11-14) |
 | Special states: onboarding, permission denied, engine fallback | denied state done |
 
 ## Module colours (human request 2026-11-14)
 
 One colour per cleanup module, defined once in `HearoKit/ModuleStyle.swift` and used
-everywhere a module is shown (popover list, live waveform, settings window, review window).
+everywhere a module is shown (popover list, live waveform, Settings and Review tabs).
 The popover's module list doubles as the legend: a swatch sits before each module's name.
 
 | Module | Light | Dark | Name |
@@ -102,15 +133,14 @@ the stroke is coloured from the outside in and the uncoloured grey **core** is w
   *Sensitivity* (%; a click repair has no depth, so it is labelled for what it does), de-smack
   and de-ess *Range* (dB). Small slider, the parameter name before it and the formatted value
   after it; disabled while the module is off. VoiceOver: "De-smack range", value "12 dB".
-- **Advanced settings window** (`Window("Advanced Settings", id: "settings")`, opened from the
-  popover's "Advanced…" link or the ⋯ / right-click menu → "Advanced settings…"): a grouped
+- **Advanced settings** — the hEARo window's **Settings** tab (see *The hEARo window*; opened
+  from the popover's "Advanced…" link or the ⋯ / right-click menu → "Advanced settings…"): a grouped
   form with one section per module in chain order — swatch, on/off checkbox (the limiter says
   "always on"), every parameter, the module description, and **Reset to defaults** (disabled
   when already default). Discrete parameters (`choices`, e.g. de-hum mains Auto/50/60 Hz) are
   a segmented picker, whole-number steps (harmonics) a stepper, everything else a slider with
   the value beside it. **Reset All…** (with confirmation) at the bottom. Resets restore values,
-  not on/off. A plain `Window` rather than the `Settings` scene: an LSUIElement app has no app
-  menu, and `openWindow` + `NSApp.activate()` brings it forward like the review window.
+  not on/off.
 - **Values** read by unit (`ParamFormat`): "24 dB", "−40 dB" (real minus), "50%" (locale
   percent), "150 Hz", "7.5 kHz", "60 ms", "0.5 ms", "4:1", choices by label; decimals follow
   the user's locale.
@@ -173,9 +203,8 @@ Goal: mark the **exact** start/end of the annoying sound in a captured clip, fas
 
 ### Implemented (2026-11-13)
 
-`Window("Review snapshots", id: "review")` in the app, opened from the popover's ⋯ menu
-(`NSApp.activate()` so the LSUIElement app's window comes to the front; never opened at
-launch). Code: `HearoKit/Snapshots.swift` (list, sidecar round-trip, WAV decode, peaks,
+The hEARo window's **Review** tab (originally its own `Window("Review snapshots")`; merged
+2026-11-14, see *The hEARo window*), opened from the popover's ⋯ menu; never opened at launch. Code: `HearoKit/Snapshots.swift` (list, sidecar round-trip, WAV decode, peaks,
 `Annotation` edit operations, `Viewport`), `ReviewModel.swift`, `ClipPlayer.swift`,
 `ReviewView.swift`, `ReviewTimeline.swift` (lanes, gestures, axis), `Spectrogram.swift` (STFT,
 log scale, colour map), `SpectrogramCache.swift`; tests in `hEARoTests/SnapshotReviewTests.swift`

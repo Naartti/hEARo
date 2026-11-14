@@ -232,6 +232,15 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
       "Use my live settings". 114 Swift tests.
   - [ ] Open: image snapshot tests; inspector slider rows don't fill the panel width; no module
         overlay on the spectrogram lane; A/B skips ≈ 10–20 ms of output latency per switch.
+- [x] **One hEARo window with tabs (human request, 2026-11-14):** Review snapshots and
+      Advanced settings merged into one native window with toolbar tabs, and the popover's
+      controls as a tab so they stay open for validation/testing. Acceptance: (a) one window,
+      native-looking tabs Controls · Review · Settings (segmented toolbar control, ⌘1–⌘3);
+      (b) Controls tab = the popover content, stays open, live waveform runs in both; (c) the
+      popover can open it (window button) and every existing entry (Advanced…, ⋯ / right-click
+      Review / Advanced) lands on the right tab; (d) no other separate windows remain.
+      `MainWindow.swift`, `ControlsView` (was `PopoverView`), menu entry "Open hEARo Window".
+  - [ ] Follow-up: stop the Controls tab's waveform poll while the window is minimised/occluded.
 - [x] **Spectrogram in the review window (2026-11-14):** log-frequency (30 Hz–20 kHz) magma
       lane under the waveform, sharing viewport/playhead/axis; marking, zoom and regions work on
       both lanes. ⇧⌘S / header toggle (remembered); resolution menu time 512 / balanced 1024 /

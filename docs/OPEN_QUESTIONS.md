@@ -55,7 +55,7 @@ The app now runs **De-smack**. Listen to the podcasts/shows where you heard smac
    de-smack, de-ess, limiter (always on). Toggle each in the popover; watch the live waveform
    (red = removed). Report anything dulled (especially t/k/p/s), pumping or clicks.
 3. **Latency is now ≈ 44.5 ms** (64-frame IO buffer; ADR 0012) — check video lip sync and calls.
-4. **Review window:** ⋯ → *Review snapshots…* — check keyboard focus (Space/1–6/arrows),
+4. **Review:** ⋯ → *Review snapshots…* (the Review tab of the hEARo window) — check keyboard focus (Space/1–6/arrows),
    scrolling/zoom, playback; proposals are pre-marked for 13 of your 21 clips.
 5. **Other Mac:** build a fresh installer with `just release` (the old DMG predates this session), follow `docs/user/INSTALL.md`
    (right-click → Open the first time). Move snapshots with ⋯ → Export/Import.

@@ -33,27 +33,21 @@ struct HearoApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            PopoverView(model: model)
+            ControlsView(model: model, viewer: .popover)
         } label: {
-            // The icon; right-click shows the app menu (review, export/import, quit).
-            MenuBarLabel(model: model, reviewWindowID: reviewWindowID)
+            // The icon; right-click shows the app menu (window, review, export/import, quit).
+            MenuBarLabel(model: model)
         }
         .menuBarExtraStyle(.window)
 
-        // Snapshot review & annotation (M6). Opened from the popover's ⋯ menu, never at launch.
-        Window("Review snapshots", id: reviewWindowID) {
-            ReviewView(model: review, locale: model.locale)
+        // The one window: Controls (the popover kept open) · Review snapshots · Settings, as
+        // toolbar tabs. Opened from the popover or the menus, never at launch. A plain `Window`
+        // (not the `Settings` scene): an LSUIElement app has no app menu to open Settings from.
+        Window("hEARo", id: mainWindowID) {
+            MainWindowView(model: model, review: review)
         }
-        .defaultSize(width: 1300, height: 640)
-        .defaultLaunchBehavior(.suppressed)
-
-        // Every parameter of every module. A plain `Window` (not the `Settings` scene): an
-        // LSUIElement app has no app menu to open Settings from, and `openWindow` + activate
-        // brings it to the front reliably, like the review window.
-        Window("Advanced Settings", id: settingsWindowID) {
-            AdvancedSettingsView(model: model)
-        }
-        .defaultSize(width: 540, height: 680)
+        .defaultSize(width: 1300, height: 680)
+        .windowResizability(.contentMinSize)
         .defaultLaunchBehavior(.suppressed)
     }
 }

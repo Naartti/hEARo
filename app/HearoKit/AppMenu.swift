@@ -2,16 +2,17 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The app menu (about, review, export/import, Finder, launch at login, quit). The same entries back
+/// The app menu (about, the hEARo window and its tabs, export/import, Finder, launch at login, quit). The same entries back
 /// the popover's ⋯ menu and the right-click menu on the menu bar icon, so they can't drift apart.
 @MainActor
 public struct AppMenu {
     public enum Item: Equatable {
-        case about, review, advanced, export, `import`, showInFinder, launchAtLogin(on: Bool), quit, divider
+        case about, window, review, advanced, export, `import`, showInFinder, launchAtLogin(on: Bool), quit, divider
 
         public var title: String {
             switch self {
             case .about: "About hEARo"
+            case .window: "Open hEARo Window"
             case .review: "Review snapshots…"
             case .advanced: "Advanced settings…"
             case .export: "Export snapshots…"
@@ -25,18 +26,17 @@ public struct AppMenu {
     }
 
     let model: AppModel
-    let openReview: () -> Void
-    let openSettings: () -> Void
+    /// Opens the hEARo window on a tab (`MainWindowView`).
+    let show: (MainTab) -> Void
 
-    public init(model: AppModel, openReview: @escaping () -> Void, openSettings: @escaping () -> Void = {}) {
+    public init(model: AppModel, show: @escaping (MainTab) -> Void) {
         self.model = model
-        self.openReview = openReview
-        self.openSettings = openSettings
+        self.show = show
     }
 
     public var items: [Item] {
         // A menu bar app has no standard app menu, so "About" lives here, first.
-        var out: [Item] = [.about, .divider, .review, .advanced, .divider, .export, .import, .showInFinder]
+        var out: [Item] = [.about, .divider, .window, .review, .advanced, .divider, .export, .import, .showInFinder]
         if model.canLaunchAtLogin { out += [.divider, .launchAtLogin(on: model.launchAtLogin)] }
         return out + [.divider, .quit]
     }
@@ -49,13 +49,9 @@ public struct AppMenu {
                 .version: AboutInfo.version(info: Bundle.main.infoDictionary ?? [:]),
                 .credits: AboutInfo.credits(),
             ])
-        case .review:
-            openReview()
-            // Menu-bar-only app (LSUIElement): bring the window in front of other apps.
-            NSApp?.activate()
-        case .advanced:
-            openSettings()
-            NSApp?.activate()
+        case .window: show(.controls)
+        case .review: show(.review)
+        case .advanced: show(.settings)
         case .export: exportPanel()
         case .import: importPanel()
         case .showInFinder: NSWorkspace.shared.open(model.snapshotFolder)
@@ -206,14 +202,10 @@ public final class StatusItemRightClick {
 /// The menu bar icon. Also installs the right-click menu (it needs the scene's `openWindow`).
 public struct MenuBarLabel: View {
     let model: AppModel
-    let reviewWindowID: String
     @Environment(\.openWindow) private var openWindow
     @State private var rightClick: StatusItemRightClick?
 
-    public init(model: AppModel, reviewWindowID: String) {
-        self.model = model
-        self.reviewWindowID = reviewWindowID
-    }
+    public init(model: AppModel) { self.model = model }
 
     public var body: some View {
         Image(systemName: model.menuBarSymbol)
@@ -222,9 +214,8 @@ public struct MenuBarLabel: View {
             .accessibilityLabel("hEARo")
             .onAppear {
                 let open = openWindow
-                let id = reviewWindowID
                 let handler = StatusItemRightClick { [model] in
-                    AppMenu(model: model, openReview: { open(id: id) }, openSettings: { open(id: settingsWindowID) }).nsMenu()
+                    AppMenu(model: model, show: { model.openMainWindow($0, using: open) }).nsMenu()
                 }
                 handler.install()
                 rightClick = handler

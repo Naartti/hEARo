@@ -1,10 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Scene id of the Advanced settings window (`Window(..., id:)` in the app).
-public let settingsWindowID = "settings"
-
-// Module parameter controls, shared by the Advanced settings window (live settings) and the
+// Module parameter controls, shared by the Settings tab of the hEARo window (live settings) and the
 // review window's inspector (a trial copy rendered offline). They take values and closures, not
 // a model, so both can use them.
 
@@ -160,7 +157,7 @@ public struct ModuleSettingsSection: View {
     }
 }
 
-/// The Advanced settings window: every parameter of every module, live.
+/// The hEARo window's Settings tab ("Advanced settings"): every parameter of every module, live.
 public struct AdvancedSettingsView: View {
     @Bindable var model: AppModel
     @State private var confirmReset = false
@@ -202,7 +199,6 @@ public struct AdvancedSettingsView: View {
             .padding(.vertical, 10)
         }
         .frame(minWidth: 480, idealWidth: 520, minHeight: 420, idealHeight: 640)
-        .onAppear { NSApp?.activate() }
         .onDisappear { tuning.flush() }
     }
 }

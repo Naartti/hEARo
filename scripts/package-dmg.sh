@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Package dist/hEARo.app into dist/hEARo-<version>.dmg (drag-to-Applications layout).
 # Not notarized unless credentials exist (scripts/notarize.sh, H5); see docs/user/INSTALL.md.
+# Usage: scripts/package-dmg.sh [App.app] [out.dmg]   (defaults: dist/hEARo.app,
+# dist/hEARo-<version>-<sha>.dmg; the release workflow names it hEARo-<version>.dmg)
 . "$(dirname "$0")/lib.sh"
-app="dist/hEARo.app"
+app="${1:-dist/hEARo.app}"
 [[ -d "$app" ]] || { echo "✘ $app missing — run scripts/build-app.sh release first"; exit 1; }
 version="$(plutil -extract CFBundleShortVersionString raw "$app/Contents/Info.plist")"
 sha="$(plutil -extract HearoGitSHA raw "$app/Contents/Info.plist")"
-dmg="dist/hEARo-${version}-${sha}.dmg"
+dmg="${2:-dist/hEARo-${version}-${sha}.dmg}"
+mkdir -p "$(dirname "$dmg")"
 rm -f "$dmg"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage" "$stage.rw.dmg"' EXIT
@@ -27,7 +30,8 @@ hdiutil detach -quiet "$mnt"
 hdiutil convert -quiet "$rw" -format UDZO -o "$dmg"
 rm -f "$rw"
 # Sign the disk image too, so its origin is verifiable.
-[[ -f .env.local ]] && set -a && . ./.env.local && set +a
-if [[ -n "${SIGN_IDENTITY:-}" ]]; then codesign --force --sign "$SIGN_IDENTITY" "$dmg"; fi
+# (Same precedence as sign.sh; an ad-hoc "-" identity adds nothing to a disk image, so skip it.)
+if [[ -z "${SIGN_IDENTITY:-}" && -f .env.local ]]; then set -a && . ./.env.local && set +a; fi
+if [[ -n "${SIGN_IDENTITY:-}" && "$SIGN_IDENTITY" != - ]]; then codesign --force --sign "$SIGN_IDENTITY" "$dmg"; fi
 hdiutil verify "$dmg" >/dev/null
 echo "✔ $dmg ($(du -h "$dmg" | cut -f1))"

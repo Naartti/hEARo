@@ -8,3 +8,4 @@ step "swift"          scripts/swift-check.sh
 step "python (ml)"    scripts/ml-check.sh
 step "repo hygiene"   scripts/check-files.sh
 finish "just check"
+stamp_green

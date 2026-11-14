@@ -21,3 +21,4 @@ step "python (ml)"        scripts/ml-check.sh
 step "docs"               scripts/docs-check.sh
 step "repo hygiene"       scripts/check-files.sh --all
 finish "just ci"
+stamp_green

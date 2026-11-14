@@ -4,7 +4,10 @@
 
 - Work autonomously through docs/PROGRESS.md; stop only for items in docs/OPEN_QUESTIONS.md.
 - Run `just check` before every commit and `just ci` at milestone end (see "Local CI" above).
-  Hooks in `.claude/settings.json` format edited files and block edits to generated files.
+  The Bash hook blocks `git commit` if the tree changed since the last green check.
+- Change files with Edit/Write, not shell heredocs or scripts: the hooks in
+  `.claude/settings.json` that format edited files and block edits to generated files only see
+  Edit/Write.
 - Follow "Any change" in AGENTS.md for every request, including one-line prompts.
 - Reviews (step 6) by area touched — run the independent ones in parallel, give them the diff
   range, not your conclusions:

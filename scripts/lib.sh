@@ -57,3 +57,12 @@ xcode_dev_dir() {
   done
   return 1
 }
+
+# Fingerprint of the tree being gated, taken when the gate starts (see tree-fingerprint.sh).
+GATE_TREE="$("$ROOT/scripts/tree-fingerprint.sh")"
+
+# stamp_green — after `finish` passed: record that this exact tree passed the gate.
+stamp_green() {
+  mkdir -p "$ROOT/target/ci"
+  echo "$GATE_TREE" >"$ROOT/target/ci/check.ok"
+}

@@ -30,6 +30,12 @@ the summary lists failures.
 
 Install with `lefthook install` (bootstrap does it). Don't skip with `--no-verify`.
 
+**Agent commit gate.** A green `just check` or `just ci` writes the working-tree fingerprint
+(`scripts/tree-fingerprint.sh`, a git tree hash of all non-ignored files) to
+`target/ci/check.ok`. The Claude Code Bash hook (`.claude/hooks/bash-guard.sh`) refuses
+`git commit` when the tree no longer matches, so agents can't commit code the gate never saw.
+Staging doesn't change the fingerprint. Humans aren't affected.
+
 ## Other useful targets
 
 `just test-golden`, `just bench`, `just docs`, `just deny`, `just ml-check`, `just lint`, `just fmt`.

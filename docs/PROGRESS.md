@@ -289,6 +289,8 @@ See docs/HANDOVER.md §14; tasks get broken out here when the milestone starts.
 - 2026-11-14 — agent workflow: "Any change" section in AGENTS.md (intent capture into DESIGN.md,
   feature branch + ff-merge, test-first commits, area reviewers + branch code review, How to
   verify). CLAUDE.md maps reviewers to areas with effort levels; reviewer models pinned.
+  Trial run of a one-line UI request followed it, except it committed without `just check` and
+  edited via shell scripts → commit gate (tree fingerprint) + "edit with Edit/Write" rule.
 - 2026-11-14 — output device following (human: AirPods connected, sound stayed on the Mac):
   listeners on default output + device list, rebuild tap + aggregate on UID/rate change,
   retry on failure, popover shows "Output: <device>" or why it's paused. Hardware test passes

@@ -45,8 +45,8 @@ This is the default workflow for every request; the human never has to restate i
 5. **Test first, commit as you go.** Failing test → code → `just check` → commit. One logical
    change per commit, every commit green, docs in the same commit, body says *why*.
 6. **Review independently** before calling it done: the area reviewers for what you touched plus
-   a general review of the whole branch diff (`main...HEAD`). Fix findings or note in
-   PROGRESS.md why one was rejected.
+   a general review of the whole branch diff (`main...HEAD`). Fix findings test-first, one
+   commit per fix, or note in PROGRESS.md why one was rejected.
 7. **Verify for real.** `just ci` green. UI changes: `just app` builds and launches; check what
    you can, then write a short *How to verify* checklist for the human.
 8. **Finish.** Tick PROGRESS.md, then `git switch main && git merge --ff-only <branch>` and

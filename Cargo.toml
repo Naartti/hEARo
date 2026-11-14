@@ -7,10 +7,10 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.100"
 license = "MIT OR Apache-2.0"
-# repository/homepage: TODO(owner) — set (and inherit in each crate) once the public URL
-# exists; deliberately left unset. Nothing goes to crates.io: every crate inherits
-# `publish = false`. Fields no crate inherits would trigger cargo's
-# `unused_workspace_package_fields` warning, so authors/keywords live in the crates when needed.
+repository = "https://github.com/Naartti/hEARo"
+# Nothing goes to crates.io: every crate inherits `publish = false`. Fields no crate inherits
+# would trigger cargo's `unused_workspace_package_fields` warning, so authors/keywords live in
+# the crates when needed.
 publish = false
 
 [workspace.dependencies]

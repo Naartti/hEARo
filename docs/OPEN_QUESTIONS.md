@@ -10,7 +10,27 @@
    keychain, then `security find-identity -v -p codesigning` → 1 valid, then `just doctor`.
    Details: [dev/SIGNING.md](dev/SIGNING.md).
 3. ~~**Menu bar icon**~~ — DONE: plain ear (SF Symbol). See [DESIGN.md](DESIGN.md).
-4. Git remote: not needed for CI (local only); add one only if you want an off-machine backup.
+4. ~~Git remote~~ — DONE 2026-11-14: <https://github.com/Naartti/hEARo> (CI and releases in
+   GitHub Actions, ADR 0016).
+
+## H5 — Notarized releases (optional) — OPEN
+
+Public releases are ad-hoc signed, so every user clicks **Open Anyway** once per version and
+re-grants System Audio Recording after each update. Notarization removes both, but needs the
+paid Apple Developer Program (99 USD/year) and a **Developer ID** certificate, and an
+individual account shows your legal name in the signature and in Gatekeeper dialogs (an
+organisation account shows the organisation's name instead). Decide whether that's worth it;
+if yes, the certificate and a notarytool API key go into GitHub Actions secrets, and
+`release.yml` signs, notarizes and staples.
+
+## GitHub setup after the CI PR merges — OPEN
+
+1. Sign in at <https://codecov.io> with GitHub and enable `Naartti/hEARo` (the coverage badge
+   and PR comments need it; uploads use OIDC, no token).
+2. Add **just ci** as a required status check in the `main` ruleset (and require a pull request
+   before merging, if you want to stop direct pushes to `main`).
+3. Optional: Settings → Actions → General → *Require actions to be pinned to a full-length
+   commit SHA* (the hygiene check already enforces it locally).
 
 ## H2 — Live passthrough listening test (M2) — DONE 2026-11-13
 

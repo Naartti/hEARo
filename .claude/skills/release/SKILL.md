@@ -1,18 +1,27 @@
 ---
 name: release
-description: Steps for cutting a hEARo release - version bump, changelog, just release, signing/notarization checks, tagging. Use when preparing a release or DMG.
+description: Steps for cutting a hEARo release - version bump, changelog, tag, the GitHub release workflow, local DMGs. Use when preparing a release or DMG.
 ---
 
 # Release
 
-1. `just ci` green on a clean tree.
-2. Bump `version` in `Cargo.toml` (workspace) and `ml/pyproject.toml`; update CHANGELOG.md.
-3. `just release` → `dist/hEARo-<version>.dmg`. Signs with Developer ID + hardened runtime +
-   timestamp, notarizes and staples when credentials exist (`xcrun notarytool` keychain
-   profile); otherwise produces an unnotarized DMG and says so.
-4. Verify: `codesign --verify --deep --strict`, `spctl --assess -vv` (notarized only), mount
-   the DMG (volume "hEARo" with the app icon, app + Applications link + read-me). On this Mac
-   install with `just install` (the one copy lives at `~/Applications/hEARo.app`; never also
-   drag the DMG's copy to /Applications, docs/dev/SIGNING.md), then run the hardware checklist
-   smoke items. Check **About hEARo** shows the new version without "· debug".
-5. Commit `chore(release): v<version>`, tag `v<version>`. Never push tags without the human.
+Public releases are built by GitHub Actions (`.github/workflows/release.yml`, ADR 0016) from a
+`v<version>` tag: ad-hoc signed, not notarized, DMG + `.sha256` + provenance attestation.
+
+1. On a branch: bump `version` in `Cargo.toml` (workspace) and `ml/pyproject.toml`; move
+   CHANGELOG.md's *Unreleased* items under `## [<version>] - <date>`. Commit
+   `chore(release): v<version>`, open a PR, wait for green checks; the human merges.
+2. Optional dry run: `gh workflow run release.yml --ref main`, then download the artifact and
+   check it (step 4).
+3. **Ask the human before tagging** — a pushed tag publishes a release. Then on the merged
+   `main`: `git tag v<version> && git push origin v<version>`; watch with `gh run watch`.
+4. Verify the published DMG on this Mac: `shasum -a 256 -c`, `gh attestation verify <dmg> --repo
+   Naartti/hEARo`, `codesign -dv` shows `Signature=adhoc` and no Authority line (no personal
+   certificate), mount it (volume "hEARo" with the icon, app + Applications link + read-me),
+   About hEARo shows the new version without "· debug". Install follows docs/user/INSTALL.md.
+5. Never upload a locally built DMG: `just release` signs with the personal identity from
+   `.env.local` (the certificate carries the owner's name). It's for the owner's own Macs;
+   `just install` installs it as this Mac's one copy at `~/Applications/hEARo.app`.
+
+Notarized releases need a paid Developer ID (H5 in docs/OPEN_QUESTIONS.md); until then
+users allow the app once via System Settings → Privacy & Security → Open Anyway.

@@ -5,7 +5,8 @@ import SwiftUI
 /// (waveform + optional spectrogram, `ReviewTimeline.swift`) in the middle, the processing
 /// inspector (`ReviewInspector.swift`) on the right. Keyboard: Space play/pause (clip under the
 /// mouse), 1–6 region class, ⌫ delete region, ⌘⌫ move clip to Trash, ↑/↓ previous/next clip,
-/// Return mark reviewed + next, Esc deselect, ⇧⌘S spectrogram, B bypass (A/B), ⌥⌘I inspector.
+/// Return mark reviewed + next, Esc deselect, ⇧⌘S spectrogram, B bypass (A/B), ⌥⌘I inspector,
+/// A accept / X false positive for the shown (else next undecided) detector proposal.
 public struct ReviewView: View {
     @Bindable var model: ReviewModel
     /// Number formatting in the inspector.
@@ -99,6 +100,12 @@ public struct ReviewView: View {
                 let cls = RegionClass(key: d)
             else { return .ignored }
             model.setClass(cls)
+            return .handled
+        }
+        // A / X: verify a detector proposal (accept = it is a smack) or mark it a false positive.
+        .onKeyPress(characters: CharacterSet(charactersIn: "aAxX"), phases: .down) { press in
+            guard focused, press.modifiers.isDisjoint(with: [.command, .option, .control]) else { return .ignored }
+            if press.characters.lowercased() == "a" { model.acceptNextProposal() } else { model.rejectNextProposal() }
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "bB"), phases: .down) { press in
@@ -369,7 +376,14 @@ struct ProposalList: View {
     var body: some View {
         if !annotation.proposals.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Detector proposals").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                HStack {
+                    Text("Detector proposals").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Spacer()
+                    let open = annotation.proposals.filter { annotation.decision(for: $0) == .undecided }.count
+                    Text(open > 0 ? "\(open) to verify · A accept · X false positive · Return reviewed & next" : "All verified · Return reviewed & next")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 ScrollView {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach(annotation.proposals) { p in
@@ -383,20 +397,39 @@ struct ProposalList: View {
     }
 
     private func row(_ p: Proposal) -> some View {
-        let accepted = annotation.acceptedRegion(for: p) != nil
+        let decision = annotation.decision(for: p)
+        let target = model.focusedProposal ?? annotation.firstUndecided
         return HStack(spacing: 8) {
+            Image(systemName: target == p.id ? "arrowtriangle.right.fill" : "circle.fill")
+                .imageScale(.small)
+                .foregroundStyle(target == p.id ? AnyShapeStyle(.primary) : AnyShapeStyle(.clear))
+                .accessibilityHidden(true)
             Text(String(format: "%.1f–%.1f ms", p.start * 1000, p.end * 1000)).monospacedDigit()
+                .strikethrough(decision == .rejected)
             Text(p.classString.replacingOccurrences(of: "_", with: " "))
             Text(p.module).foregroundStyle(.secondary)
             if let db = p.dbRemoved { Text(String(format: "%.1f dB", db)).foregroundStyle(.secondary) }
             if p.inPressWindow { Image(systemName: "scope").foregroundStyle(.secondary).help("In the press window") }
             Spacer()
-            Button("Show") { model.viewport.show(p.start...p.end) }
-            Button(accepted ? "Accepted" : "Accept") { model.accept(proposal: p.id) }
-                .disabled(accepted)
+            Button("Show") { model.showProposal(p.id) }
+                .help("Zoom to it; A / X then act on this one")
+            Button(decision == .accepted ? "Accepted" : "Accept (A)", systemImage: "checkmark") {
+                model.accept(proposal: p.id)
+            }
+            .disabled(decision == .accepted)
+            .help("It is what the detector says: keep it as a marked region (A)")
+            Button(decision == .rejected ? "False positive" : "False positive (X)", systemImage: "xmark") {
+                model.reject(proposal: p.id)
+            }
+            .disabled(decision == .rejected)
+            .help("The detector was wrong: keep it as a hard negative for training (X)")
         }
+        .labelStyle(.titleAndIcon)
         .font(.caption)
         .controlSize(.small)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(
+            "Proposal \(String(format: "%.0f", p.start * 1000)) milliseconds, \(decision == .accepted ? "accepted" : decision == .rejected ? "false positive" : "not verified")")
     }
 }
 

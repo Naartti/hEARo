@@ -67,6 +67,7 @@ public final class ReviewModel {
         player?.stop()
         selectedIndex = index
         selectedRegion = nil
+        focusedProposal = nil
         let info = clips[index]
         do {
             let clip = try SnapshotLibrary.loadAudio(info.wavURL)
@@ -143,7 +144,40 @@ public final class ReviewModel {
         var id: UUID?
         edit { id = $0.accept(proposal: index) }
         selectedRegion = id
+        focusedProposal = nil
         commit()
+    }
+
+    /// Mark a proposal as a false positive (saved in the sidecar's `rejected`).
+    public func reject(proposal index: Int) {
+        if let p = annotation?.proposals.first(where: { $0.id == index }), annotation?.acceptedRegion(for: p) != nil {
+            selectedRegion = nil
+        }
+        edit { $0.reject(proposal: index) }
+        focusedProposal = nil
+        commit()
+    }
+
+    /// The proposal last shown ("Show"); A / X act on it before the first undecided one.
+    public private(set) var focusedProposal: Int?
+
+    /// Zoom to a proposal and make it the target of A / X.
+    public func showProposal(_ index: Int) {
+        guard let p = annotation?.proposals.first(where: { $0.id == index }) else { return }
+        viewport.show(p.start...p.end)
+        focusedProposal = index
+    }
+
+    private var proposalTarget: Int? { focusedProposal ?? annotation?.firstUndecided }
+
+    /// A: the detection is right (it is a smack) → a region.
+    public func acceptNextProposal() {
+        if let i = proposalTarget { accept(proposal: i) }
+    }
+
+    /// X: the detection is a false positive → `rejected`.
+    public func rejectNextProposal() {
+        if let i = proposalTarget { reject(proposal: i) }
     }
 
     /// Return: mark the clip done and move on to the next one.

@@ -330,6 +330,19 @@ See docs/HANDOVER.md §14; tasks get broken out here when the milestone starts.
       unmarked audio is the negative set; mix clean events from training days; split by day.
       ADR 0017, docs/ml/README.md. Follow-up for M6: make "reviewed = exhaustive" visible in
       the Review tab (hint text near the Reviewed toggle).
+- [x] **Auto-save de-smack catches** (human request 2026-11-14). Done: event ring off the audio
+  thread, `autocapture` policy + `save_auto`/expiry, FFI settings + status counters, Settings
+  section + orange ear, Review A/X with `rejected` (ADR 0018, DESIGN *Auto-saved de-smack
+  catches*, docs/ml/README.md). Needs a human try-out in the app (How to verify in the PR).
+  Acceptance:
+  - Settings: on/off (default **off**), daily cap (default **250**, adjustable), auto-delete of
+    unreviewed auto clips after **31** days (adjustable).
+  - When on, every de-smack trigger saves a clip around it (catches close together share one
+    clip) with the detection pre-marked as a proposal with start and end; the ear icon flashes
+    **orange** (de-smack colour) when it's saved.
+  - Review: clearly labelled keyboard shortcuts to accept a detection (verified smack) or mark it
+    a false positive (stored as a hard negative), then Return = reviewed + next.
+  - Engine path RT-safe (events leave the audio thread through a lock-free ring); tests first.
 
 - [x] M6 (early): snapshot review & annotation window — list, waveform with hint/proposals/
       regions, drag to create/move/resize, zoom/pan, 1–6 classes, Space plays the clip under

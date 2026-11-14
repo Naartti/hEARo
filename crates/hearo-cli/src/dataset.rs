@@ -21,7 +21,8 @@ pub enum Cmd {
     },
     /// Run the detectors offline over every snapshot and store where they think the annoying
     /// sound is as `proposals` in each sidecar (your own `regions` are never touched). The review
-    /// window pre-marks these; training can use them as weak labels.
+    /// window pre-marks these; training can use them as weak labels. Auto-saved clips are skipped
+    /// (they already have the live detector's proposals).
     Propose {
         /// Only print, don't write sidecars.
         #[arg(long)]
@@ -74,6 +75,11 @@ fn propose(dir: &std::path::Path, dry_run: bool, keys: &[String]) -> Result<()> 
     let (mut total, mut in_window, mut clips_hit) = (0usize, 0usize, 0usize);
     let stems = snapshots::list(dir);
     for stem in &stems {
+        // Auto-saved clips already carry the live detector's proposals, and the review window's
+        // accept/false-positive decisions match their exact spans: never overwrite them.
+        if stem.split('-').nth(2) == Some("auto") {
+            continue;
+        }
         let wav = hearo_testkit::wav::read(dir.join(format!("{stem}.wav")))?;
         let sr = wav.sample_rate as f32;
         // Detectors only (no repair needed): run the user-facing modules and collect events.

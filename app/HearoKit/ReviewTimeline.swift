@@ -274,8 +274,13 @@ struct TimelineMarks {
             }
             // Proposals: dashed brackets along the top and bottom edges.
             for p in annotation.proposals where p.end >= viewport.start && p.start <= viewport.end {
-                let accepted = annotation.acceptedRegion(for: p) != nil
+                let decision = annotation.decision(for: p)
+                let accepted = decision == .accepted
                 let rect = span(p.start, p.end, inset: 6)
+                if decision == .rejected {
+                    rejectedMark(&ctx, rect)
+                    continue
+                }
                 var path = Path()
                 for y in [rect.minY, rect.maxY] {
                     let dy = y == rect.minY ? 5.0 : -5.0
@@ -291,12 +296,28 @@ struct TimelineMarks {
         }
         // Proposals: dashed outlines.
         for p in annotation.proposals where p.end >= viewport.start && p.start <= viewport.end {
-            let accepted = annotation.acceptedRegion(for: p) != nil
+            let decision = annotation.decision(for: p)
             let rect = span(p.start, p.end, inset: 2)
+            if decision == .rejected {
+                rejectedMark(&ctx, rect)
+                continue
+            }
             ctx.stroke(
-                Path(rect), with: .color(p.cls.color.opacity(accepted ? 0.4 : 0.9)),
+                Path(rect), with: .color(p.cls.color.opacity(decision == .accepted ? 0.4 : 0.9)),
                 style: StrokeStyle(lineWidth: 1.2, dash: [4, 3]))
         }
+    }
+
+    /// A false positive: a grey dashed box, crossed out.
+    private func rejectedMark(_ ctx: inout GraphicsContext, _ rect: CGRect) {
+        var cross = Path()
+        cross.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        cross.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        cross.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+        cross.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        let grey = GraphicsContext.Shading.color(.gray.opacity(0.8))
+        ctx.stroke(Path(rect), with: grey, style: StrokeStyle(lineWidth: 1.2, dash: [4, 3]))
+        ctx.stroke(cross, with: grey, lineWidth: 1)
     }
 
     private func regionEdges(_ ctx: inout GraphicsContext, _ rect: CGRect, _ r: Region, _ isSelected: Bool) {

@@ -1,9 +1,50 @@
-# hEARo
+<p align="center">
+  <img src="app/Resources/Icon/hEARo.svg" width="128" height="128" alt="hEARo app icon">
+</p>
+
+<h1 align="center">hEARo</h1>
+
+<p align="center">
+  <strong>Real-time cleanup of everything your Mac plays.</strong><br>
+  Mouth clicks, lip smacks, harsh sibilance, mains hum and plosive pops, removed before they
+  reach your ears.
+</p>
+
+<p align="center">
+  <a href="https://github.com/Naartti/hEARo/actions/workflows/ci.yml"><img src="https://github.com/Naartti/hEARo/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
+  <a href="https://github.com/Naartti/hEARo/releases/latest"><img src="https://img.shields.io/github/v/release/Naartti/hEARo?sort=semver&amp;display_name=tag" alt="Latest release"></a>
+  <a href="https://codecov.io/gh/Naartti/hEARo"><img src="https://codecov.io/gh/Naartti/hEARo/graph/badge.svg" alt="Test coverage"></a>
+  <a href="#license"><img src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue" alt="License: MIT OR Apache-2.0"></a>
+  <img src="https://img.shields.io/badge/macOS-26%2B%20%C2%B7%20Apple%20silicon-111111?logo=apple" alt="macOS 26+ on Apple silicon">
+  <img src="https://img.shields.io/badge/Rust-1.100-dea584?logo=rust" alt="Rust 1.100">
+</p>
+
+<p align="center">
+  <a href="https://github.com/Naartti/hEARo/releases/latest"><strong>Download</strong></a> ·
+  <a href="docs/user/INSTALL.md">Install guide</a> ·
+  <a href="#build-from-source">Build from source</a> ·
+  <a href="docs/README.md">Documentation</a>
+</p>
 
 hEARo is a macOS menu bar app that cleans up the sound your Mac plays — mouth clicks, lip
 smacks, harsh sibilance, mains hum and plosive pops — in real time, before it reaches your
 ears. It works on podcasts, YouTube, Teams, Slack huddles and anything else that plays audio,
 and leaves music players alone. Everything runs locally on your Mac: no network, no telemetry.
+
+<table>
+  <tr>
+    <td width="34%" valign="top">
+      <img src="docs/assets/screenshots/menu-bar.webp" alt="The hEARo menu bar popover: master switch, live waveform with removed sounds highlighted, and a toggle, amount slider and event count for each module">
+    </td>
+    <td valign="top">
+      <img src="docs/assets/screenshots/review.webp" alt="The hEARo window's Review tab: a list of saved snapshots, a waveform and spectrogram with a marked lip smack, and the processing inspector with per-module settings">
+    </td>
+  </tr>
+  <tr>
+    <td valign="top"><sub><b>Menu bar.</b> One switch, a live waveform (what was removed shows in colour) and a slider per module.</sub></td>
+    <td valign="top"><sub><b>Review.</b> Press <code>§</code> when something slips through; replay the snapshot, mark it and try other settings on it.</sub></td>
+  </tr>
+</table>
 
 | Module | What it removes |
 |---|---|
@@ -17,11 +58,20 @@ and leaves music players alone. Everything runs locally on your Mac: no network,
 ## Status
 
 Pre-1.0, a personal project developed in the open. All six DSP modules, the live engine and
-the menu bar app work, but expect rough edges, changing behaviour and no binary releases yet;
-the machine-learning detector (`ml/`, `crates/hearo-ml`) is not built yet. Progress is tracked in [docs/PROGRESS.md](docs/PROGRESS.md).
+the menu bar app work, but expect rough edges and changing behaviour; the machine-learning
+detector (`ml/`, `crates/hearo-ml`) is not built yet. Progress is tracked in
+[docs/PROGRESS.md](docs/PROGRESS.md), changes in [CHANGELOG.md](CHANGELOG.md).
 
 - macOS 26 (Tahoe) or later, Apple silicon only.
 - macOS only; there are no plans for other platforms at the moment.
+
+## Install
+
+Download the DMG from the [latest release](https://github.com/Naartti/hEARo/releases/latest),
+open it and drag hEARo to Applications. Releases are built by GitHub Actions from a tagged
+commit, with a checksum and a build-provenance attestation. They aren't notarized by Apple, so
+the first launch needs one trip to System Settings → Privacy & Security → **Open Anyway**.
+Step by step, including updates: [docs/user/INSTALL.md](docs/user/INSTALL.md).
 
 ## Build from source
 
@@ -84,12 +134,15 @@ never leaves you in silence.
 - Bluetooth and AirPlay outputs add their own device latency on top; AirPlay speakers are not
   yet tested.
 - macOS 26+ on Apple silicon only; no Intel, no older macOS, no other operating systems.
-- No downloadable releases yet (none are notarized), so for now you build it yourself.
+- Releases aren't notarized: macOS asks you to allow the app once per version, and asks for
+  System Audio Recording again after each update.
 
 ## Contributing
 
-Contributions are welcome — please read [CONTRIBUTING.md](CONTRIBUTING.md) first. hEARo has
-no hosted CI: `just check` and `just ci` run the full gate locally. Please follow the
+Contributions are welcome — please read [CONTRIBUTING.md](CONTRIBUTING.md) first. The whole
+gate runs locally with `just check` / `just ci`, and GitHub Actions re-runs `just ci` on every
+pull request ([docs/dev/LOCAL_CI.md](docs/dev/LOCAL_CI.md)); `just coverage` shows Rust test
+coverage. Please follow the
 [Code of Conduct](CODE_OF_CONDUCT.md), and report security issues privately as described in
 [SECURITY.md](SECURITY.md).
 

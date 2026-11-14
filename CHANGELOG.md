@@ -35,3 +35,8 @@ is 0.1.0; nothing has been released yet.
   Python project skeleton, architecture decision records 0001–0013 and deep dives.
 - Open-source readiness: MIT OR Apache-2.0 licence texts, contributing guide, code of
   conduct, security policy, issue and PR templates, documentation index.
+- **GitHub Actions** (ADR 0016, supersedes 0009): `just ci` and Rust coverage (`just
+  coverage`, Codecov) on every pull request; tagged releases build an ad-hoc signed DMG with a
+  checksum and build-provenance attestation and publish it as a GitHub Release. Actions are
+  pinned by commit SHA; Dependabot keeps actions and crates current. README with icon, badges
+  and screenshots.

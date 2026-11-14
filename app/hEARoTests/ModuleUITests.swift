@@ -18,6 +18,15 @@ struct ModuleStyleTests {
         #expect(ModuleStyle.style("future-module").colorName == "grey")
     }
 
+    /// The menu bar follows the wallpaper, not the app's appearance, so the icon tint is one
+    /// mid-luminance colour that reads on light and dark bars (UI review: the light variant is
+    /// dark brown, nearly invisible on a dark bar).
+    @Test func menuBarTintIsTheSameMidOrangeInBothAppearances() {
+        let s = ModuleStyle.style("desmack")
+        #expect(s.menuBarHex == s.dark)
+        #expect(s.menuBarHex == 0xF2662A)
+    }
+
     /// Dark variants are lighter (they sit on dark backgrounds and the magma spectrogram).
     @Test func darkVariantsAreLighter() {
         func luma(_ hex: UInt32) -> Double {

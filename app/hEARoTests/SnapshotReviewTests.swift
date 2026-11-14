@@ -248,6 +248,25 @@ struct AnnotationTests {
         #expect(Annotation(duration: 8, sampleRate: sr).merged(into: [:])["rejected"] == nil)
     }
 
+    /// Decisions still match after the sidecar round trip at 44.1 kHz, where proposal times (ms
+    /// precision) aren't on the sample grid.
+    @Test func decisionsSurviveTheSidecarRoundTripAt44k1() throws {
+        let rate = 44_100.0
+        let props: [[String: Any]] = [
+            ["start_s": 4.98, "end_s": 5.0, "class": "lip_smack", "module": "desmack"],
+            ["start_s": 6.123, "end_s": 6.141, "class": "lip_smack", "module": "desmack"],
+        ]
+        var a = Annotation(sidecar: ["proposals": props], duration: 8, sampleRate: rate)
+        _ = a.accept(proposal: 0)
+        a.reject(proposal: 1)
+        let json = try JSONSerialization.data(withJSONObject: a.merged(into: ["proposals": props]))
+        let side = try #require(try JSONSerialization.jsonObject(with: json) as? [String: Any])
+        let back = Annotation(sidecar: side, duration: 8, sampleRate: rate)
+        #expect(back.decision(for: back.proposals[0]) == .accepted)
+        #expect(back.decision(for: back.proposals[1]) == .rejected)
+        #expect(back.firstUndecided == nil && back.regions.count == 1 && back.rejected.count == 1)
+    }
+
     @Test func hitTestingPrefersEdgesThenSmallestRegion() throws {
         var a = blank()
         let big = try req(a.addRegion(from: 1, to: 3))
@@ -444,6 +463,38 @@ struct ReviewModelTests {
         // Nothing left to decide: the keys do nothing.
         m.acceptNextProposal()
         #expect((try f.read("snapshot-400-auto")["regions"] as? [Any])?.isEmpty == true)
+    }
+
+    /// X on a proposal must not drop a different region the user has selected (UI review).
+    @Test func rejectKeepsAnUnrelatedSelection() throws {
+        let f = try Fixture()
+        try f.wav("snapshot-401-auto", seconds: 8)
+        try f.json(
+            "snapshot-401-auto",
+            ["label": "auto", "unix_time": 401, "seconds": 8.0, "proposals": [["start_s": 2.0, "end_s": 2.02, "class": "lip_smack"]]])
+        let m = ReviewModel(library: SnapshotLibrary(folder: f.dir))
+        m.reload()
+        m.acceptNextProposal()
+        let mine = try req(m.addRegion(from: 6.0, to: 6.1))
+        m.reject(proposal: 0)
+        #expect(m.selectedRegion == mine)
+        #expect(m.annotation?.regions.map(\.id) == [mine])
+    }
+
+    /// An auto clip deleted underneath the window (hourly expiry) must not get its sidecar back.
+    @Test func editingADeletedClipDoesNotRecreateItsSidecar() throws {
+        let f = try Fixture()
+        try f.wav("snapshot-402-auto", seconds: 8)
+        try f.json(
+            "snapshot-402-auto",
+            ["label": "auto", "unix_time": 402, "seconds": 8.0, "proposals": [["start_s": 2.0, "end_s": 2.02, "class": "lip_smack"]]])
+        let m = ReviewModel(library: SnapshotLibrary(folder: f.dir))
+        m.reload()
+        try FileManager.default.removeItem(at: f.dir.appendingPathComponent("snapshot-402-auto.wav"))
+        try FileManager.default.removeItem(at: f.dir.appendingPathComponent("snapshot-402-auto.json"))
+        m.acceptNextProposal()
+        #expect(!FileManager.default.fileExists(atPath: f.dir.appendingPathComponent("snapshot-402-auto.json").path))
+        #expect(m.errorMessage != nil)
     }
 
     @Test func zoomToRegion() throws {

@@ -212,7 +212,6 @@ public struct MenuBarLabel: View {
     let model: AppModel
     @Environment(\.openWindow) private var openWindow
     @State private var rightClick: StatusItemRightClick?
-    @Environment(\.colorScheme) private var scheme
 
     public init(model: AppModel) { self.model = model }
 
@@ -220,7 +219,7 @@ public struct MenuBarLabel: View {
         switch model.iconState.tint {
         case .template: .primary
         case .accent: .accentColor
-        case .module(let key): ModuleStyle.color(key, scheme)
+        case .module(let key): ModuleStyle.style(key).menuBarColor
         }
     }
 

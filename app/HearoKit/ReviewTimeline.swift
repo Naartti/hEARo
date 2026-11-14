@@ -39,7 +39,7 @@ struct TimelineEditor: View {
     }
 
     @State private var mode: Mode?
-    @State private var lastClick: (date: Date, x: Double)?
+    @State private var lastClick: (date: Date, x: CGFloat)?
     @State private var overEdge = false
 
     /// Pixels within which an edge can be grabbed.

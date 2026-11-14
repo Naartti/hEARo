@@ -20,12 +20,12 @@ Details: [docs/dev/SETUP.md](docs/dev/SETUP.md). To run the app you also need a 
 signing identity: [docs/dev/SIGNING.md](docs/dev/SIGNING.md). Run `just` to list every
 command; use the `just` recipes rather than raw `cargo`/`swift`/`uv` calls.
 
-## Local CI — there is no hosted CI
+## CI — run it locally first
 
-hEARo deliberately has **no GitHub Actions or other hosted CI**
-([ADR 0009](docs/adr/0009-local-ci-no-hosted-ci.md)): the audio engine needs a real Mac,
-real Core Audio and macOS 26, so the gates run on your machine. Please don't add workflow
-files — the hygiene check rejects them.
+The gates are `just` recipes that run on your Mac; GitHub Actions runs the same `just ci` on
+every pull request ([ADR 0016](docs/adr/0016-github-actions-ci-and-releases.md)). Run them
+locally before you push — it's faster, and hardware tests and CPU budgets only run on a real
+Mac. Workflows only call `just`/`scripts/`, and actions are pinned to a commit SHA.
 
 | When | Run |
 |---|---|
@@ -37,8 +37,8 @@ files — the hygiene check rejects them.
 [lefthook](https://lefthook.dev) git hooks (installed by bootstrap) enforce this: pre-commit
 runs formatters, markdownlint and the hygiene check on staged files, commit-msg checks the
 commit message, and pre-push runs `just ci`. **Never bypass them with `--no-verify`** — a red
-gate is fixed, not skipped. Please mention in your PR that `just ci` passed. More:
-[docs/dev/LOCAL_CI.md](docs/dev/LOCAL_CI.md).
+gate is fixed, not skipped. The PR's **just ci** check must be green before merging; PRs are
+rebase-merged. More: [docs/dev/LOCAL_CI.md](docs/dev/LOCAL_CI.md).
 
 ## Rules of the road
 

@@ -1,5 +1,5 @@
 # hEARo — every developer and agent command. Run `just` to list.
-# There is no hosted CI: `just check` and `just ci` ARE the CI (docs/adr/0009-local-ci-no-hosted-ci.md).
+# `just check` and `just ci` are the CI; GitHub Actions runs the same `just ci` (docs/adr/0016-github-actions-ci-and-releases.md).
 
 # Recipes run through `mise x` so the pinned toolchains (.mise.toml) are used even in shells
 # where mise isn't activated.
@@ -62,6 +62,10 @@ golden-update:
 # Hardware tests: switch the default output and back; watchdog with a tone playing (quit hEARo first). Checklist: docs/testing/HARDWARE_CHECKLIST.md
 test-hw:
     cargo test -p hearo-ffi --test hw_output_switch --test hw_watchdog -- --ignored --nocapture --test-threads=1
+
+# Rust line coverage (cargo-llvm-cov) → target/coverage/{lcov.info,summary.txt,html/}
+coverage:
+    scripts/coverage.sh
 
 # Benchmarks (divan) + enforced CPU budgets (release build)
 bench:

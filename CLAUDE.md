@@ -3,7 +3,7 @@
 ## Claude Code specifics
 
 - Work autonomously through docs/PROGRESS.md; stop only for items in docs/OPEN_QUESTIONS.md.
-- Run `just check` before every commit and `just ci` at milestone end (see "Local CI" above).
+- Run `just check` before every commit and `just ci` at milestone end (see "CI" above).
   The Bash hook blocks `git commit` if the tree changed since the last green check.
 - Change files with Edit/Write, not shell heredocs or scripts: the hooks in
   `.claude/settings.json` that format edited files and block edits to generated files only see

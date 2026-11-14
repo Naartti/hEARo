@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# `just ci` — the full local CI gate (there is no hosted CI; see docs/adr/0009-local-ci-no-hosted-ci.md).
-# Run before pushing, at the end of every milestone, and after dependency/toolchain bumps.
+# `just ci` — the full CI gate. Runs locally (pre-push hook, milestone end, dependency/toolchain
+# bumps) and unchanged in GitHub Actions (.github/workflows/ci.yml, docs/adr/0016-github-actions-ci-and-releases.md).
 # Output is also written to target/ci/last.log.
 . "$(dirname "$0")/lib.sh"
 mkdir -p target/ci
@@ -12,7 +12,12 @@ step "rust tests"         cargo nextest run --workspace --no-tests=pass --status
 step "golden tests"       scripts/golden.sh
 step "doc tests"          cargo test --workspace --doc --quiet
 step "benches compile"    cargo bench --workspace --no-run --quiet
-step "cpu budgets"        cargo test --release -p hearo-dsp --test budgets --quiet -- --ignored
+# Timing on shared hosted runners is noise; budgets are enforced on a real Mac (ADR 0016).
+if [[ "${GITHUB_ACTIONS:-}" == true ]]; then
+  warn "cpu budgets skipped on a hosted runner (run \`just bench\` on a Mac)"
+else
+  step "cpu budgets"      cargo test --release -p hearo-dsp --test budgets --quiet -- --ignored
+fi
 step "cargo-deny"         cargo deny --log-level error check
 step "cargo-machete"      cargo machete
 step "swift"              scripts/swift-check.sh

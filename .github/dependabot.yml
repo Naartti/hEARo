@@ -1,0 +1,28 @@
+# Weekly update PRs, grouped to keep the noise down. Each one runs `just ci` in GitHub Actions;
+# Cargo bumps still follow AGENTS.md (exact pins, licence in deny.toml, API checked).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ['*']
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      cargo-patch-minor:
+        update-types: [minor, patch]

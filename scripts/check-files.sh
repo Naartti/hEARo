@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Repo hygiene: no files > 5 MB, no audio/model files outside allowed paths, no secrets files.
+# Repo hygiene: no files > 5 MB, no audio/model files outside allowed paths, no secrets files,
+# workflow actions pinned to a commit SHA.
 # Default: staged files. `--all`: every tracked file.
 . "$(dirname "$0")/lib.sh"
 if [[ "${1:-}" == "--all" ]]; then
@@ -22,7 +23,11 @@ while IFS= read -r f; do
     .env|.env.*|*.p12|*.cer|*.mobileprovision|*.pem) echo "✘ $f: secrets/certificates must never be committed"; bad=1 ;;
   esac
   case "$f" in
-    .github/workflows/*) echo "✘ $f: no hosted CI in this project (ADR 0009)"; bad=1 ;;
+    .github/workflows/*.yml|.github/workflows/*.yaml)
+      # Supply chain (ADR 0016): third-party actions only by full commit SHA, tag as a comment.
+      if unpinned="$(grep -nE '^[[:space:]-]*uses:[[:space:]]*[^.[:space:]]' "$f" | grep -vE '@[0-9a-f]{40}([[:space:]]|$)')"; then
+        echo "✘ $f: pin actions to a commit SHA (uses: owner/repo@<sha> # vX.Y.Z):"; echo "$unpinned"; bad=1
+      fi ;;
   esac
 done <<< "$files"
 exit $bad

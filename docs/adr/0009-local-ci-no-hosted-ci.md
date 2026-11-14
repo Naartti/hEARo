@@ -1,6 +1,7 @@
 # 0009. Local CI only — no hosted CI
 
-Date: 2026-11-13 · Status: accepted (supersedes the GitHub Actions plan in HANDOVER §10.7)
+Date: 2026-11-13 · Status: superseded by [0016](0016-github-actions-ci-and-releases.md)
+(it superseded the GitHub Actions plan in HANDOVER §10.7)
 
 ## Context
 

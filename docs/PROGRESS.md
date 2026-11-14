@@ -320,6 +320,12 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
     the only such line, and a mismatch fails loudly at the tag check.
   - [ ] Hosted runs blocked: "account is locked due to a billing issue" (owner fixes in GitHub
         billing); then re-run PR #1's checks.
+  - [x] CI lost rustfmt/clippy on a mise cache hit (PR #2, 2026-11-14): mise reported
+        `rust@1.100.0 already installed` and sets `RUSTUP_TOOLCHAIN`, so rustup ignored
+        `rust-toolchain.toml`'s components. Fix: components on the `rust` tool in `.mise.toml`
+        (which also changes the mise cache key).
+  - [ ] Flaky on the hosted runner: `ReviewInspectorTests.staleRenderResultIsDropped` (saw 2
+        processed loads instead of 1 once; passed on re-run). Make it independent of timing.
   - [ ] First release: tag `v0.1.0` once the human says so (the `release` skill).
   - [ ] Swift coverage (`swift test --enable-code-coverage`) not measured yet.
 - [ ] **De-uhm (filled pauses: "uhm", "eh", Swedish "öh")** — low priority (human, 2026-11-13).

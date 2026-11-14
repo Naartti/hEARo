@@ -1,6 +1,8 @@
 # Pinned toolchains. `mise install` gives a ready environment.
 [tools]
-rust = "1.100.0"
+# Components here, not only in rust-toolchain.toml: mise sets RUSTUP_TOOLCHAIN, which makes
+# rustup ignore that file's component list (a cached install on CI came back without them).
+rust = { version = "1.100.0", components = "rustfmt,clippy", profile = "minimal" }
 just = "1.59.0"
 python = "3.12.16"
 uv = "0.13.8"

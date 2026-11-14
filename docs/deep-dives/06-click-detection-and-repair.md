@@ -77,6 +77,32 @@ synthetic long smacks the part after the first 8 ms is ducked by a median 21–2
 ~8 ms (first tick) of a loud long smack still plays**: deciding before it would need ≈ 50 ms of
 lookahead (≈ 55 ms total latency) — the human's call.
 
+**Slow tails** (human-labelled miss, 2026-11-14, a close-mic demo recording). Two ticks peaking
+~55 dB above a −64 dB floor, then a 4–8 kHz wet hiss plus a < 150 Hz thump, ~30 dB down and
+decaying only ≈ 0.3 dB/ms, so the tail reached the floor ~120 ms after the onset. The 60 ms
+limit dropped it as "too long" (the de-esser then took 10 dB off part of the hiss — inaudible).
+**Not fixed, on purpose.** Tried: accept a tail that keeps falling at a moderate rate (5 ms
+level, 0.7–3 dB per 5 ms, three checks in a row, ≥ 20 dB below the peak) and let it take up to
+200 ms. It caught synthetic copies of the clip (0/29 → 29/29, tails −24 dB) but the DSP review
+rejected it:
+
+- A **word-final stop released into a pause** ("that." — burst, fading aspiration, silence) is
+  physically the same thing: a burst with a slowly decaying noise tail and quiet after it.
+  On stops with weak or fading aspiration it ducked 12–27 % of them (0–3 % before). The 60 ms
+  limit is what spares them; it isn't arbitrary.
+- An envelope's own release after a burst drops onto a plateau also "falls at a moderate rate"
+  for up to three 5 ms steps (from 6 dB above: 2.8, 1.75, 0.9 dB), so a rate test alone can't
+  separate a decaying tail from a flat one early on.
+- The existing stop test couldn't see the damage: it counts reported events, and a provisional
+  duck that is released reports none. Follow-up: measure stops per burst + aspiration, add
+  weak/decaying-aspiration and utterance-final variants (PROGRESS backlog).
+- Even then the clip's ticks still played: at the 40 ms deadline its tail had dropped 27 dB and
+  wobbled flat for 10 ms, the same picture as a stop with aspiration 30 dB down.
+
+What would fix it: seeing whether speech follows (≈ 60–100 ms lookahead, over the 45 ms ceiling
+— OPEN_QUESTIONS H3), or a learned discriminator (the ML stage; this clip is a labelled
+example).
+
 ## The repair: ducking, not cutting
 
 A confirmed smack is turned down to about the pause floor (+3 dB), at most *range* (24 dB): a
@@ -97,7 +123,8 @@ audio, and attenuating to the room tone sounds natural: the listener hears a sho
 | linked stereo (mid/side power), render-then-delete, ≥1 ms fade | 0.93–0.95 | 0 | 0 | 13–17 | stops still 26 % |
 | stay quiet 20 ms + 40 ms lookahead | 0.93–0.95 | 0 | 0 | 13–17 | stops 2 %, but **real smacks: 2/19** — 5 ms envelopes too slow for real room tone |
 | 2 ms decay envelopes, age limit on the burst only | 0.93–0.95 | 0 | 1 | 13–17 | stops 4 %; real: 14/19 |
-| re-open on ticks + provisional duck (long smacks) | **0.93–0.95** | **0** | **1.5** | **13–17** | stops 4 %; long smacks 0.83–0.97, −21…−23 dB after 8 ms; **real labelled regions ≥ 10 dB: 5/23 → 17/23** |
+| re-open on ticks + provisional duck (long smacks) | **0.93–0.95** | **0** | **1.5** | **13–17** | stops 4 %; long smacks 0.83–0.97, −21…−23 dB after 8 ms; **real labelled regions ≥ 10 dB: 5/23 → 17/23** (17/34 with the 11 snapshots added later) |
+| *(rejected)* settling slow tails | 0.93–0.95 | 0 | 1.5 | 13–17 | loud slow-tailed smacks 0/29 → 29/29, but word-final / weak-aspiration stops 12–27 % ducked (released ducks, invisible to the stop test) |
 
 **Real snapshots (19 clips, the human's `§` presses):** a smack is ducked 0.3–2.5 s before the
 press in 14 of 19 clips, by 12–24 dB, almost always exactly one per clip. Synthetic tests are
@@ -108,6 +135,9 @@ proxies — the real clips overruled them once already (the 2/19 row above).
 - Smacks **overlapping speech** aren't handled — the "in a pause" condition is the whole point.
   That's the ML stage (§7.6).
 - Long multi-tick smacks: the first ~8 ms can play before the provisional duck starts (above).
+- Loud close-mic smacks whose tail takes > 60 ms to settle are not touched at all (above).
+- A smack within ~80 ms of speech ending is measured against a pause floor that is still
+  settling (up to 12 dB high), so its duck can end while the tail is still audible.
 - Stop consonants: 2–4 % still ducked on synthetic stops — real speech is the test; report
   dulled consonants with "false hit" snapshots.
 - **Latency:** 40 ms lookahead + a 128-frame IO buffer ≈ 43 ms added (target ≤ 30, ceiling 45;

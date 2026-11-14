@@ -158,6 +158,15 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
       smooth at block sizes 1–2048, linked stereo. Real snapshots: 14/19 clips. 40 ms lookahead +
       128-frame IO buffer ≈ 43 ms (ADR 0011). Deep dive 06. Reviews: dsp + rt (all fixed).
   - [ ] Human listening test in the app (H3) — then tune on "false hit"/"missed" snapshots.
+  - [x] Loud smack with a slow tail missed (human demo recording, 2026-11-14): explain why.
+        Cause: its tail took 120 ms to settle, past the 60 ms limit. A fix was built, then
+        rejected in DSP review (ducks word-final/weak-aspiration stops; deep dive 06). Docs only;
+        real fix needs more lookahead (H3) or the ML stage.
+  - [ ] Stop-consonant test blind spot: measure per stop over burst + aspiration (released
+        provisional ducks report no event); add weak-, decaying-aspiration and utterance-final
+        stop variants (DSP review 2026-11-14; HEAD already ducks some weak-aspiration stops).
+  - [ ] Investigate the 11 `missed` snapshots captured 2026-11-14 afternoon (all 0 dB reduced
+        — a different cause).
   - [ ] Review suggestions left: smack 0–5 ms before a word, double clicks, digital-silence
         pauses, HF-only floor, upstream-latency-aware event timestamps.
 - [x] **De-ess** (split-band dynamic bell + onset gate, 0 lookahead). 12 golden tests at
@@ -334,6 +343,13 @@ See docs/HANDOVER.md §14; tasks get broken out here when the milestone starts.
   listeners on default output + device list, rebuild tap + aggregate on UID/rate change,
   retry on failure, popover shows "Output: <device>" or why it's paused. Hardware test passes
   (AirPods ⇄ speakers, < 0.8 s).
+
+- 2026-11-14 — demo recording: a loud close-mic smack (55 dB over the floor) was dropped as
+  "too long" — its wet hiss + thump tail took 120 ms to settle. A settling-tail path passed its
+  own regression test but the DSP review showed it ducks word-final stops released into a pause
+  (same physics) — reverted, documented. Surprises: an envelope's release looks like a decaying
+  tail; the thump's 60–120 Hz ripples a 2 ms envelope by > 6 dB; the stop test can't see
+  released provisional ducks.
 
 - 2026-11-14 — human review of snapshots: (1) de-smack missed a long multi-tick smack (latest
   clip) → re-open on ticks + provisional duck at the lookahead deadline; labelled clip now

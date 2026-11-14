@@ -67,6 +67,11 @@ The app now runs **De-smack**. Listen to the podcasts/shows where you heard smac
 - Still annoying smack → press `§` ("missed it"). Something removed that shouldn't be → run
   `just cli run --modules desmack` and press `f` + Enter ("false hit"), or tell me.
 - Latency is now ≈ 43 ms (ADR 0011) — say if video lip sync or calls feel off.
+- **Decision wanted (2026-11-14):** loud close-mic smacks with a slow "wet" tail (> 60 ms) are
+  missed; by level alone they look like a word-final "t" released into a pause (deep dive 06).
+  Telling them apart in time needs ≈ 60–100 ms lookahead (to see whether speech follows), over
+  the 45 ms ceiling. Options: (a) keep 43 ms, leave it to the ML stage; (b) an opt-in "max
+  cleanup" mode with ~100 ms lookahead for listening (not calls). Default: (a).
 
 ## Morning checklist (after the overnight run, 2026-11-14) — OPEN
 

@@ -14,6 +14,8 @@ pub enum Label {
     Missed,
     /// "hEARo removed something it shouldn't have."
     FalseHit,
+    /// Saved automatically around de-smack catches (opt-in, ADR 0018); unverified until reviewed.
+    Auto,
 }
 
 impl Label {
@@ -22,8 +24,20 @@ impl Label {
         match self {
             Self::Missed => "missed",
             Self::FalseHit => "false_hit",
+            Self::Auto => "auto",
         }
     }
+}
+
+/// One de-smack catch inside an auto-saved clip, relative to the clip start.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Catch {
+    /// Start, seconds.
+    pub start_s: f64,
+    /// End, seconds.
+    pub end_s: f64,
+    /// Gain reduction applied, dB.
+    pub db_removed: f32,
 }
 
 /// Default snapshot directory.
@@ -217,7 +231,109 @@ pub fn save(
     sample_rate: f64,
     label: Label,
     ctx: &Context,
-) -> Result<PathBuf, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<PathBuf, DynErr> {
+    let (stem, now, wav) = write_wav(dir, left, right, sample_rate, label)?;
+    let mut sidecar = base_sidecar(dir, left.len() as f64 / sample_rate, sample_rate, label, now, ctx);
+    let secs = left.len() as f64 / sample_rate;
+    // The key was pressed at the end of the clip; people react ~0.5–2 s after the event.
+    sidecar["press_at_s"] = serde_json::json!(secs);
+    sidecar["event_hint_s"] = serde_json::json!([(secs - 2.5).max(0.0), (secs - 0.3).max(0.0)]);
+    std::fs::write(dir.join(format!("{stem}.json")), serde_json::to_string_pretty(&sidecar)?)?;
+    Ok(wav)
+}
+
+/// Write an auto-saved clip (label `auto`) with its de-smack catches as `proposals`, in the same
+/// format as `hearo dataset propose`, so the review window pre-marks them. Returns the WAV path.
+pub fn save_auto(
+    dir: &Path,
+    left: &[f32],
+    right: &[f32],
+    sample_rate: f64,
+    ctx: &Context,
+    catches: &[Catch],
+) -> Result<PathBuf, DynErr> {
+    let (stem, now, wav) = write_wav(dir, left, right, sample_rate, Label::Auto)?;
+    let secs = left.len() as f64 / sample_rate;
+    let mut sidecar = base_sidecar(dir, secs, sample_rate, Label::Auto, now, ctx);
+    let ms = |s: f64| (s * 1000.0).round() / 1000.0;
+    let proposals: Vec<serde_json::Value> = catches
+        .iter()
+        .map(|c| {
+            serde_json::json!({
+                "start_s": ms(c.start_s),
+                "end_s": ms(c.end_s),
+                "class": "lip_smack",
+                "module": "desmack",
+                "db_removed": (f64::from(c.db_removed) * 10.0).round() / 10.0,
+                "in_press_window": true,
+            })
+        })
+        .collect();
+    let lo = catches.iter().map(|c| c.start_s).fold(f64::INFINITY, f64::min);
+    let hi = catches.iter().map(|c| c.end_s).fold(0.0, f64::max);
+    if lo.is_finite() {
+        sidecar["event_hint_s"] = serde_json::json!([ms((lo - 0.1).max(0.0)), ms((hi + 0.1).min(secs))]);
+    }
+    sidecar["proposals"] = serde_json::Value::Array(proposals);
+    sidecar["proposals_by"] = serde_json::json!(format!("hearo {} live [\"desmack\"]", env!("CARGO_PKG_VERSION")));
+    std::fs::write(dir.join(format!("{stem}.json")), serde_json::to_string_pretty(&sidecar)?)?;
+    Ok(wav)
+}
+
+/// Unix times of the auto-saved clips in `dir` (from their file names; no file reads).
+pub fn auto_save_times(dir: &Path) -> Vec<u64> {
+    list(dir).iter().filter_map(|s| auto_save_time(s)).collect()
+}
+
+/// Delete auto-saved clips older than `max_age_days` that were never touched in the review window
+/// (not reviewed, no regions, nothing rejected) — clips you worked on are kept, and so are
+/// hotkey snapshots. Deletions are recorded in [`DELETED_FILE`] so an import doesn't bring them
+/// back. Returns how many were deleted.
+pub fn expire_auto(dir: &Path, max_age_days: u32, now_unix: u64) -> usize {
+    let cutoff = now_unix.saturating_sub(u64::from(max_age_days) * 86_400);
+    let mut deleted = Vec::new();
+    for stem in list(dir) {
+        let Some(unix) = auto_save_time(&stem) else { continue };
+        if unix >= cutoff {
+            continue;
+        }
+        let json = dir.join(format!("{stem}.json"));
+        let side: serde_json::Value =
+            std::fs::read_to_string(&json).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+        let nonempty = |k: &str| side[k].as_array().is_some_and(|a| !a.is_empty());
+        if side["reviewed"] == true || nonempty("regions") || nonempty("rejected") {
+            continue;
+        }
+        let wav = dir.join(format!("{stem}.wav"));
+        let size = std::fs::metadata(&wav).map(|m| m.len()).unwrap_or(0);
+        if std::fs::remove_file(&wav).is_ok() {
+            let _ = std::fs::remove_file(&json);
+            deleted.push(format!("{stem}\t{size}\n"));
+        }
+    }
+    if !deleted.is_empty() {
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(dir.join(DELETED_FILE)) {
+            let _ = f.write_all(deleted.concat().as_bytes());
+        }
+    }
+    deleted.len()
+}
+
+/// `snapshot-<unix>-auto[-n][-importedN]` → unix.
+fn auto_save_time(stem: &str) -> Option<u64> {
+    let (unix, label) = stem.strip_prefix("snapshot-")?.split_once('-')?;
+    (label == "auto" || label.starts_with("auto-")).then(|| unix.parse().ok())?
+}
+
+/// Write the WAV under a fresh `snapshot-<unix>-<label>[-n]` stem.
+fn write_wav(
+    dir: &Path,
+    left: &[f32],
+    right: &[f32],
+    sample_rate: f64,
+    label: Label,
+) -> Result<(String, std::time::Duration, PathBuf), DynErr> {
     std::fs::create_dir_all(dir)?;
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?;
     let mut stem = format!("snapshot-{}-{}", now.as_secs(), label.as_str());
@@ -240,8 +356,19 @@ pub fn save(
         w.write_sample(*r)?;
     }
     w.finalize()?;
-    let secs = left.len() as f64 / sample_rate;
-    let sidecar = serde_json::json!({
+    Ok((stem, now, wav))
+}
+
+/// The sidecar keys every snapshot has.
+fn base_sidecar(
+    dir: &Path,
+    secs: f64,
+    sample_rate: f64,
+    label: Label,
+    now: std::time::Duration,
+    ctx: &Context,
+) -> serde_json::Value {
+    serde_json::json!({
         "label": label.as_str(),
         "unix_time": now.as_secs(),
         "seconds": secs,
@@ -252,13 +379,8 @@ pub fn save(
         "source": ctx.source,
         "device": if ctx.device.is_empty() { dir.parent().map(device_id).unwrap_or_default() } else { ctx.device.clone() },
         "hearo_version": env!("CARGO_PKG_VERSION"),
-        // The key was pressed at the end of the clip; people react ~0.5–2 s after the event.
-        "press_at_s": secs,
-        "event_hint_s": [(secs - 2.5).max(0.0), (secs - 0.3).max(0.0)],
         "regions": [],
-    });
-    std::fs::write(dir.join(format!("{stem}.json")), serde_json::to_string_pretty(&sidecar)?)?;
-    Ok(wav)
+    })
 }
 
 #[cfg(test)]
@@ -285,6 +407,61 @@ mod tests {
         assert_eq!(side["label"], "missed");
         assert!((side["press_at_s"].as_f64().unwrap() - 0.01).abs() < 1e-9);
         assert_eq!(side["device"], "d1");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn auto_clip_carries_its_catches_as_proposals() {
+        let dir = std::env::temp_dir().join(format!("hearo-auto-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let catches = [Catch { start_s: 4.98, end_s: 5.0004, db_removed: 17.96 }];
+        let wav = save_auto(&dir, &[0.0; 4800], &[0.0; 4800], 48_000.0, &Context::default(), &catches).unwrap();
+        assert!(wav.file_name().unwrap().to_string_lossy().contains("-auto"));
+        let side: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(wav.with_extension("json")).unwrap()).unwrap();
+        assert_eq!(side["label"], "auto");
+        assert!(side["press_at_s"].is_null(), "nobody pressed a key");
+        let p = &side["proposals"][0];
+        assert_eq!((p["start_s"].as_f64(), p["end_s"].as_f64()), (Some(4.98), Some(5.0)));
+        assert_eq!((p["class"].as_str(), p["module"].as_str()), (Some("lip_smack"), Some("desmack")));
+        assert_eq!(p["db_removed"].as_f64(), Some(18.0));
+        assert_eq!(side["event_hint_s"][0].as_f64(), Some(4.88));
+        assert_eq!(side["regions"].as_array().map(Vec::len), Some(0));
+        assert_eq!(auto_save_times(&dir).len(), 1);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Only old, untouched auto clips go; reviewed or edited ones and hotkey snapshots stay.
+    #[test]
+    fn expiry_deletes_only_old_untouched_auto_clips() {
+        let dir = std::env::temp_dir().join(format!("hearo-expire-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let day = 86_400;
+        let now = 100 * day;
+        let make = |stem: &str, extra: serde_json::Value| {
+            std::fs::write(dir.join(format!("{stem}.wav")), b"RIFF").unwrap();
+            let mut side = serde_json::json!({"label": "auto", "regions": [], "proposals": [{}]});
+            if let (Some(s), Some(e)) = (side.as_object_mut(), extra.as_object()) {
+                s.extend(e.clone());
+            }
+            std::fs::write(dir.join(format!("{stem}.json")), side.to_string()).unwrap();
+        };
+        let old = now - 40 * day;
+        make(&format!("snapshot-{old}-auto"), serde_json::json!({}));
+        make(&format!("snapshot-{old}-auto-2"), serde_json::json!({}));
+        make(&format!("snapshot-{}-auto", old + 1), serde_json::json!({"reviewed": true}));
+        make(&format!("snapshot-{}-auto", old + 2), serde_json::json!({"rejected": [{"start_s": 1.0}]}));
+        make(&format!("snapshot-{}-auto", old + 3), serde_json::json!({"regions": [{"start_s": 1.0}]}));
+        make(&format!("snapshot-{}-auto", now - 10 * day), serde_json::json!({}));
+        make(&format!("snapshot-{old}-missed"), serde_json::json!({"label": "missed"}));
+        assert_eq!(expire_auto(&dir, 31, now), 2);
+        let left = list(&dir);
+        assert_eq!(left.len(), 5, "{left:?}");
+        assert!(!left.contains(&format!("snapshot-{old}-auto")));
+        let deleted = std::fs::read_to_string(dir.join(DELETED_FILE)).unwrap();
+        assert_eq!(deleted.lines().count(), 2, "recorded so an import won't resurrect them");
+        assert_eq!(expire_auto(&dir, 31, now), 0, "idempotent");
         std::fs::remove_dir_all(dir).unwrap();
     }
 

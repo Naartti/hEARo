@@ -23,7 +23,7 @@ the project [README](../README.md); this page maps the rest.
 | Document | What it covers |
 |---|---|
 | [dev/SETUP.md](dev/SETUP.md) | Fresh clone to working environment (`just bootstrap`, `just doctor`) |
-| [dev/LOCAL_CI.md](dev/LOCAL_CI.md) | The local CI gates (`just check`, `just ci`) and git hooks — there is no hosted CI |
+| [dev/LOCAL_CI.md](dev/LOCAL_CI.md) | CI: the `just check` / `just ci` gates, GitHub Actions, coverage, releasing, git hooks |
 | [dev/SIGNING.md](dev/SIGNING.md) | Why the app needs a stable signing identity and how to create one |
 | [testing/STRATEGY.md](testing/STRATEGY.md) | Test layers: unit, property, real-time safety, golden audio, budgets |
 | [testing/HARDWARE_CHECKLIST.md](testing/HARDWARE_CHECKLIST.md) | Manual checks that need real devices and a human ear |

@@ -10,15 +10,19 @@ The full brief is docs/HANDOVER.md; current state and next task are in docs/PROG
 2. Read the doc for the area you'll touch (docs/ARCHITECTURE.md, docs/DESIGN.md, docs/adr/).
 3. If tools seem off, run `just doctor`.
 
-## Local CI — there is no hosted CI (ADR 0009)
+## CI — local gate first, GitHub Actions re-runs it (ADR 0016)
 
-Everything runs on this Mac through `just` → `scripts/*.sh`. Never add GitHub Actions.
+Everything runs on this Mac through `just` → `scripts/*.sh`. GitHub Actions
+(`.github/workflows/ci.yml`) runs the same `just ci` on every PR and push to `main`, plus
+coverage; a `v*` tag runs `release.yml`. Never put logic in a workflow that `just` can't run
+locally; pin actions by commit SHA (the hygiene check enforces it).
 
 | When | Run | What it covers |
 |---|---|---|
 | Before **every** commit | `just check` (≈5 s warm, < 60 s) | rustfmt, clippy `-D warnings`, all fast Rust tests (incl. property, RT-safety, and a stress test simulating 10 min of audio in < 1 s), Swift build + tests, ruff + pytest, repo hygiene |
 | Before every push, at **milestone end**, after any dependency/toolchain bump, after touching `deny.toml`/`justfile`/`scripts/` | `just ci` | `check` + golden tests + doc tests + CPU budgets (release) + cargo-deny + cargo-machete + XcodeGen spec + markdownlint + offline link check. Log: `target/ci/last.log` |
-| After touching DSP module code | `just test-golden`, `just bench` | measurable quality thresholds; CPU budget per block |
+| After touching DSP module code | `just test-golden`, `just bench` | measurable quality thresholds; CPU budget per block (local only: hosted runners skip budgets) |
+| Optional, after adding tests | `just coverage` | Rust line coverage → `target/coverage/html/index.html` (CI uploads it to Codecov) |
 | Docs-only change | `just docs` | lint + links |
 
 Git hooks (lefthook) enforce this: pre-commit = fmt/ruff/markdownlint/hygiene on staged files,
@@ -49,10 +53,13 @@ This is the default workflow for every request; the human never has to restate i
    commit per fix, or note in PROGRESS.md why one was rejected.
 7. **Verify for real.** `just ci` green. UI changes: `just app` builds and launches; check what
    you can, then write a short *How to verify* checklist for the human.
-8. **Finish.** Tick PROGRESS.md, then `git switch main && git merge --ff-only <branch>` and
-   delete the branch. (No remote yet; once there is one, push the branch and open a PR from
-   `.github/PULL_REQUEST_TEMPLATE.md` instead.) Report: what changed, decisions made, review
-   findings, and the How to verify checklist.
+8. **Finish.** Tick PROGRESS.md (in the branch), `git push -u origin <branch>` (pre-push runs
+   `just ci`), open a PR with `gh pr create` filled from `.github/PULL_REQUEST_TEMPLATE.md`
+   (body ends with the How to verify checklist), and wait for `gh pr checks --watch` to go
+   green; a red hosted run is fixed like a red local one. The human merges (rebase merge on
+   GitHub, branch auto-deleted) unless they asked you to; afterwards `git switch main && git
+   pull --ff-only`. Report: the PR link, what changed, decisions made, review findings, and the
+   How to verify checklist.
 
 ## Other commands (always via just)
 

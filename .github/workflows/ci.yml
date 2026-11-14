@@ -1,0 +1,85 @@
+# The same `just ci` gate the pre-push hook runs, on a clean macOS 26 machine (ADR 0016).
+# Toolchains come from .mise.toml; actions are pinned by commit SHA (scripts/check-files.sh).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  gate:
+    name: just ci
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+        with:
+          version: 2026.11.2
+          install: true
+          cache: true
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Toolchain versions
+        run: |
+          xcodebuild -version
+          mise x -- rustc --version
+      - name: just ci
+        run: mise x -- just ci
+      - name: Upload CI log
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-log
+          path: target/ci/last.log
+
+  coverage:
+    name: coverage
+    runs-on: macos-26
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write # Codecov upload via OIDC, no token secret
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d # v5.2.4
+        with:
+          version: 2026.11.2
+          install: true
+          cache: true
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: coverage
+      - name: just coverage
+        run: |
+          mise x -- just coverage
+          {
+            echo '### Rust line coverage'
+            echo '```text'
+            cat target/coverage/summary.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload to Codecov
+        # OIDC tokens aren't issued to pull requests from forks; their coverage stays in the summary.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: target/coverage/lcov.info
+          disable_search: true
+          use_oidc: true
+          fail_ci_if_error: false

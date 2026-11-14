@@ -27,7 +27,7 @@ the summary lists failures.
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `ci.yml` → *just ci* | every PR, push to `main` | `just ci` on `macos-26` with the `.mise.toml` toolchains. CPU budgets are skipped (`GITHUB_ACTIONS=true`): shared-runner timing is noise, so run `just bench` on a Mac after DSP changes. On failure the log is attached as the `ci-log` artifact. |
+| `ci.yml` → *just ci* | every PR, push to `main` | `just ci` on `macos-26` with the `.mise.toml` toolchains and **Xcode 26.6**, the oldest we support (`swift-tools-version: 6.2`) — newer Swift accepts code that 26.x rejects, so a green local build on a newer Xcode isn't enough (`XCODE_VERSION` in both workflows). CPU budgets are skipped (`GITHUB_ACTIONS=true`): shared-runner timing is noise, so run `just bench` on a Mac after DSP changes. On failure the log is attached as the `ci-log` artifact. |
 | `ci.yml` → *coverage* | every PR, push to `main` | `just coverage`; summary in the job summary, `lcov.info` uploaded to Codecov (OIDC, no secret) |
 | `release.yml` | tag `v*`, or manually as a dry run | builds and publishes a release (see [Releasing](#releasing)) |
 

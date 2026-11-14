@@ -17,6 +17,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  XCODE_VERSION: '26.6' # the oldest Xcode we support; also used by release.yml
 
 jobs:
   gate:
@@ -33,6 +34,10 @@ jobs:
           install: true
           cache: true
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: Select the oldest supported Xcode
+        # swift-tools-version 6.2 → Xcode 26 is the minimum. Building with it catches code that
+        # only compiles with a newer Swift (e.g. implicit CGFloat→Double in a tuple, Xcode 27).
+        run: sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
       - name: Toolchain versions
         run: |
           xcodebuild -version

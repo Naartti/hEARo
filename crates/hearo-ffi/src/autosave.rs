@@ -8,8 +8,15 @@ use hearo_engine::snapshots::{self, Context};
 
 use crate::{HearoEngine, Inner};
 
-/// How often untouched old auto clips are swept.
+/// How often untouched old auto clips are swept — and how long a *changed* retention waits
+/// before it deletes anything, so a value typed by mistake can be corrected first.
 const EXPIRY_EVERY: Duration = Duration::from_secs(3600);
+
+/// The snapshot folder. Never the real one in unit tests: they must not read or sweep the
+/// developer's dataset (review finding).
+fn snapshot_dir() -> Option<std::path::PathBuf> {
+    if cfg!(test) { None } else { snapshots::default_dir() }
+}
 
 /// The user's auto-save settings (the app persists them; hEARo clamps them).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Record)]
@@ -67,19 +74,38 @@ pub(crate) struct AutoSave {
     generation: u32,
     /// Clips saved this session (the app flashes the icon when it grows).
     pub saved_session: u32,
-    last_expiry: Option<Instant>,
+    /// When the next expiry sweep may run; `None` until the app has handed over the user's
+    /// settings (so a launch never sweeps with the default retention).
+    next_sweep: Option<Instant>,
 }
 
 impl Default for AutoSave {
     fn default() -> Self {
-        let previous = snapshots::default_dir().map(|d| snapshots::auto_save_times(&d)).unwrap_or_default();
+        let previous = snapshot_dir().map(|d| snapshots::auto_save_times(&d)).unwrap_or_default();
         Self {
             settings: AutoCaptureSettings::default(),
             policy: AutoCapture::new(previous),
             generation: 0,
             saved_session: 0,
-            last_expiry: None,
+            next_sweep: None,
         }
+    }
+}
+
+impl AutoSave {
+    /// The app handed over settings: the first time (launch, stored values) sweeping may start
+    /// now; after a change it waits [`EXPIRY_EVERY`].
+    fn configured(&mut self, now: Instant) {
+        self.next_sweep = Some(if self.next_sweep.is_none() { now } else { now + EXPIRY_EVERY });
+    }
+
+    /// The retention to sweep with, if a sweep is due (then the next one is an hour away).
+    fn sweep_due(&mut self, now: Instant) -> Option<u32> {
+        let due = self.next_sweep.is_some_and(|t| now >= t);
+        if due {
+            self.next_sweep = Some(now + EXPIRY_EVERY);
+        }
+        due.then_some(self.settings.retention_days)
     }
 }
 
@@ -137,13 +163,10 @@ impl HearoEngine {
         let (job, sweep) = {
             let mut inner = self.lock();
             let job = inner.auto_collect(now);
-            let due = inner.auto.last_expiry.is_none_or(|t| t.elapsed() >= EXPIRY_EVERY);
-            if due {
-                inner.auto.last_expiry = Some(Instant::now());
-            }
-            (job, due.then_some(inner.auto.settings.retention_days))
+            let due = inner.auto.sweep_due(Instant::now());
+            (job, due)
         };
-        let Some(dir) = snapshots::default_dir() else { return };
+        let Some(dir) = snapshot_dir() else { return };
         if let Some(days) = sweep {
             snapshots::expire_auto(&dir, days, now);
         }
@@ -168,11 +191,33 @@ impl HearoEngine {
     pub fn set_auto_capture(&self, config: AutoCaptureConfig) {
         let mut inner = self.lock();
         inner.auto.settings = AutoCaptureSettings::from(config).clamped();
-        inner.auto.last_expiry = None; // sweep on the next tick with the new retention
+        inner.auto.configured(Instant::now());
     }
 
     /// The current (clamped) auto-save settings.
     pub fn auto_capture(&self) -> AutoCaptureConfig {
         self.lock().auto.settings.into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// No sweep before the app handed over the user's settings; the first hand-over sweeps at
+    /// once, later changes (a mistyped retention) only after an hour, then hourly.
+    #[test]
+    fn expiry_waits_for_settings_and_for_an_hour_after_a_change() {
+        let t0 = Instant::now();
+        let mut a = AutoSave::default();
+        assert_eq!(a.sweep_due(t0), None, "never with the default retention at launch");
+        a.settings.retention_days = 90;
+        a.configured(t0);
+        assert_eq!(a.sweep_due(t0), Some(90));
+        assert_eq!(a.sweep_due(t0 + Duration::from_secs(60)), None, "hourly");
+        a.settings.retention_days = 1; // typed by mistake
+        a.configured(t0 + Duration::from_secs(120));
+        assert_eq!(a.sweep_due(t0 + Duration::from_secs(1800)), None, "a change waits an hour");
+        assert_eq!(a.sweep_due(t0 + Duration::from_secs(120) + EXPIRY_EVERY), Some(1));
     }
 }

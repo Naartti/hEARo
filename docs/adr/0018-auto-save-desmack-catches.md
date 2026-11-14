@@ -21,8 +21,9 @@ fills) and runs a pure policy (`hearo_engine::autocapture`): de-smack catches wi
 burst; once 3 s after its last catch are captured, the 8 s window is cut from the capture ring by
 absolute frame (chain input clock = capture clock) and saved as label `auto` with the catches as
 `proposals`. A rolling 24 h cap (seeded from the files on disk) drops clips beyond it; untouched
-auto clips (not reviewed, no regions, nothing rejected) older than the retention are deleted,
-hourly and when settings change. The engine is rebuilt on device changes, so pending bursts are
+auto clips (not reviewed, no regions, nothing rejected, readable sidecar) older than the
+retention are deleted hourly — never before the app has handed over the user's settings at
+launch, and only an hour after a change, so a mistyped retention can be corrected first. The engine is rebuilt on device changes, so pending bursts are
 forgotten when its generation changes. Settings live in the app's preferences; Rust clamps them.
 In Review, accepted proposals become regions and rejected ones go to a `rejected` list — the
 hard negatives.

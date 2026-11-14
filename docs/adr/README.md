@@ -20,3 +20,4 @@ Template: [0000-template.md](0000-template.md). How to write one: `.claude/skill
 | [0014](0014-engine-supervisor-watchdog-and-wake.md) | Engine supervisor: watchdog and sleep/wake recovery in Rust | accepted |
 | [0015](0015-module-settings-and-reduction-columns.md) | Module settings owned by Rust; per-module GR columns | accepted |
 | [0016](0016-github-actions-ci-and-releases.md) | GitHub Actions for CI and releases, local gate stays first | accepted |
+| [0017](0017-dataset-from-hotkey-snapshots.md) | Mouth-noise dataset from hotkey snapshots, not a recording session | accepted |

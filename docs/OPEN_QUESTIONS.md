@@ -49,6 +49,9 @@ audio + a JSON sidecar to
 `~/Library/Application Support/hEARo/snapshots/` (local only; never committed — snapshots can
 contain other people's voices). 5–20 examples from different speakers/shows are ideal; tell me
 roughly where in each clip the smack is if you can (e.g. "around 6 s").
+**2026-11-14:** this is now the dataset plan (ADR 0017, docs/ml/README.md): keep capturing in
+meetings, podcasts and videos for a few days; in Review, mark *every* mouth noise in a clip
+before marking it reviewed; press `f` on dulled consonants too.
 Status: 4 clips captured (6 s each, before the 8 s fix); 3 show a clear pause smack
 0.6–2 s before the press (5–15 ms, 15–25 dB above the pause).
 

@@ -23,6 +23,7 @@ step "cargo-machete"      cargo machete
 step "swift"              scripts/swift-check.sh
 step "xcodegen spec"      scripts/xcodegen-validate.sh
 step "python (ml)"        scripts/ml-check.sh
+step "workflows"          actionlint   # GitHub Actions syntax/expressions + shellcheck of run: blocks
 step "docs"               scripts/docs-check.sh
 step "repo hygiene"       scripts/check-files.sh --all
 finish "just ci"

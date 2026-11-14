@@ -17,9 +17,11 @@ use hearo_engine::{DEFAULT_EXCLUDES, EngineConfig, EngineError, LiveBackend, Liv
 
 uniffi::setup_scaffolding!();
 
+mod autosave;
 mod render;
 mod settings;
 
+pub use autosave::{AutoCaptureConfig, AutoCaptureLimits, auto_capture_limits};
 pub use render::{ModuleReduction, RenderEvent, RenderReport, render_clip};
 use settings::ModuleState;
 pub use settings::{
@@ -99,6 +101,10 @@ pub struct EngineStatus {
     pub panics: u64,
     /// Snapshots saved this session.
     pub snapshots_saved: u32,
+    /// Clips auto-saved around de-smack catches this session (flash the icon when it grows).
+    pub auto_saved_session: u32,
+    /// Auto-saved clips in the last 24 hours (the daily limit counts these).
+    pub auto_saved_last_24h: u32,
     /// Times the engine followed a new output device (or sample rate) this session.
     pub device_switches: u32,
     /// Why hEARo isn't processing although switched on (e.g. the new output device can't be
@@ -167,6 +173,8 @@ struct Inner {
     snapshots_saved: u32,
     last_stats: StatsSnapshot,
     playing_apps: (Instant, u32),
+    /// Auto-saving de-smack catches (ADR 0018).
+    auto: autosave::AutoSave,
 }
 
 impl Inner {
@@ -246,6 +254,8 @@ fn spawn_supervisor(engine: Weak<HearoEngine>) {
                 inner.sup.woke(now);
             }
             inner.sup.tick(now);
+            drop(inner);
+            e.auto_step();
         }
     });
     // Without the thread hEARo still works; it just won't follow device changes or recover.
@@ -270,6 +280,7 @@ impl HearoEngine {
                 snapshots_saved: 0,
                 last_stats: StatsSnapshot::default(),
                 playing_apps: (Instant::now() - Duration::from_secs(10), 0),
+                auto: autosave::AutoSave::default(),
             }),
         });
         spawn_supervisor(Arc::downgrade(&engine));
@@ -336,6 +347,8 @@ impl HearoEngine {
             inner.playing_apps = (Instant::now(), n as u32);
         }
         let processing_apps = inner.playing_apps.1;
+        let (auto_saved_session, auto_saved_last_24h) =
+            (inner.auto.saved_session, HearoEngine::auto_saved_last_24h(&mut inner));
         let Some(engine) = inner.engine() else {
             return EngineStatus {
                 running: false,
@@ -353,6 +366,8 @@ impl HearoEngine {
                 faults: 0,
                 panics: 0,
                 snapshots_saved: inner.snapshots_saved,
+                auto_saved_session,
+                auto_saved_last_24h,
                 device_switches: inner.sup.counters().device_switches,
                 problem: inner.sup.problem().unwrap_or_default().to_string(),
                 modules,
@@ -381,6 +396,8 @@ impl HearoEngine {
             faults: s.faults,
             panics: s.panics,
             snapshots_saved: inner.snapshots_saved,
+            auto_saved_session,
+            auto_saved_last_24h,
             device_switches: inner.sup.counters().device_switches,
             problem: inner.sup.problem().unwrap_or_default().to_string(),
             modules,
@@ -550,6 +567,20 @@ mod tests {
         let w = e.waveform(7, 100);
         assert_eq!((w.next, w.peaks.len()), (7, 0), "no engine → nothing, same cursor");
         assert_eq!(w.reductions.len(), 5, "one (empty) row per cleanup module");
+        e.stop();
+    }
+
+    #[test]
+    fn auto_capture_is_off_by_default_and_clamped() {
+        let e = HearoEngine::new(vec!["desmack".into()]);
+        let d = e.auto_capture();
+        assert_eq!(d, AutoCaptureConfig { enabled: false, daily_cap: 250, retention_days: 31 });
+        assert_eq!(auto_capture_limits().max_daily_cap, 2000);
+        e.set_auto_capture(AutoCaptureConfig { enabled: true, daily_cap: 0, retention_days: 9999 });
+        assert_eq!(e.auto_capture(), AutoCaptureConfig { enabled: true, daily_cap: 1, retention_days: 365 });
+        let s = e.status();
+        assert_eq!(s.auto_saved_session, 0);
+        e.set_auto_capture(d);
         e.stop();
     }
 

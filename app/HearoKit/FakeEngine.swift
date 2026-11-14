@@ -43,6 +43,15 @@ public final class FakeEngine: Engine {
         }
     }
 
+    public private(set) var autoCapture = AutoCaptureLimits.standard.defaults
+
+    public func setAutoCapture(_ settings: AutoCaptureSettings) {
+        calls.append("autoCapture=\(settings.enabled)/\(settings.dailyCap)/\(settings.retentionDays)")
+        autoCapture = settings.clamped(to: autoCaptureLimits)
+    }
+
+    public nonisolated var autoCaptureLimits: AutoCaptureLimits { .standard }
+
     public func saveSnapshot(falseHit: Bool) throws -> String {
         calls.append("snapshot falseHit=\(falseHit)")
         guard state.running else { throw FakeError.notRunning }

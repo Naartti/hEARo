@@ -176,6 +176,7 @@ public struct AdvancedSettingsView: View {
                         onEnabled: { model.setModule(m.id, enabled: $0) },
                         onReset: { tuning.reset(m.id) })
                 }
+                AutoCaptureSection(model: model)
             }
             .formStyle(.grouped)
             Divider()
@@ -200,6 +201,65 @@ public struct AdvancedSettingsView: View {
         }
         .frame(minWidth: 480, idealWidth: 520, minHeight: 420, idealHeight: 640)
         .onDisappear { tuning.flush() }
+    }
+}
+
+/// Settings tab: auto-save a clip around every de-smack catch for the dataset (ADR 0018).
+struct AutoCaptureSection: View {
+    @Bindable var model: AppModel
+
+    private func binding<T>(_ key: WritableKeyPath<AutoCaptureSettings, T>) -> Binding<T> {
+        Binding(
+            get: { model.autoCapture[keyPath: key] },
+            set: {
+                var s = model.autoCapture
+                s[keyPath: key] = $0
+                model.setAutoCapture(s)
+            })
+    }
+
+    var body: some View {
+        let limits = model.autoCaptureLimits
+        Section {
+            Toggle("Save a clip around every removed smack", isOn: binding(\.enabled))
+            LabeledContent("Daily limit") {
+                number(binding(\.dailyCap), in: 1...limits.maxDailyCap, step: 50, unit: "clips", label: "Daily limit")
+            }
+            LabeledContent("Delete unreviewed clips after") {
+                number(
+                    binding(\.retentionDays), in: 1...limits.maxRetentionDays, step: 1, unit: "days",
+                    label: "Delete unreviewed clips after")
+            }
+            LabeledContent("Saved in the last 24 hours") {
+                Text("\(model.snapshot.autoSavedLast24h) of \(model.autoCapture.dailyCap)").monospacedDigit()
+            }
+        } header: {
+            HStack(spacing: 8) {
+                ModuleSwatch("desmack", size: 11)
+                Text("Auto-save de-smack catches").font(.headline)
+            }
+        } footer: {
+            Text(
+                "Builds the training dataset while you listen. Each clip is 8 s of the original sound with the catch pre-marked; it stays on this Mac and appears as Auto in the Review tab, where A accepts the catch and X marks a false positive. Off by default. Clips you reviewed or edited are never deleted automatically."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func number(
+        _ value: Binding<Int>, in range: ClosedRange<Int>, step: Int, unit: String, label: String
+    ) -> some View {
+        HStack(spacing: 6) {
+            TextField(label, value: value, format: .number)
+                .labelsHidden()
+                .multilineTextAlignment(.trailing)
+                .frame(width: 64)
+            Text(unit).foregroundStyle(.secondary).accessibilityHidden(true)
+            Stepper(label, value: value, in: range, step: step).labelsHidden()
+        }
+        .accessibilityElement(children: .contain)
     }
 }
 

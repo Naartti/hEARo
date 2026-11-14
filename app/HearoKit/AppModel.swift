@@ -9,19 +9,38 @@ public enum MenuBarIconState: Equatable, Sendable {
     case removing
     /// A snapshot was just saved: checkmark badge.
     case snapshotSaved
+    /// A clip around a de-smack catch was auto-saved: checkmark badge in the de-smack colour.
+    case autoSaved
     case problem
 
     public var symbol: String {
         switch self {
         case .off: "ear"
         case .on, .removing: "ear.fill"
-        case .snapshotSaved: "ear.badge.checkmark"
+        case .snapshotSaved, .autoSaved: "ear.badge.checkmark"
         case .problem: "ear.trianglebadge.exclamationmark"
         }
     }
 
-    /// Momentary states are drawn in the accent colour; the rest is a template image.
-    public var isAccent: Bool { self == .removing || self == .snapshotSaved }
+    /// How the icon is coloured.
+    public enum Tint: Equatable, Sendable {
+        /// A template image (follows the menu bar).
+        case template
+        case accent
+        /// A module's colour (`ModuleStyle`).
+        case module(String)
+    }
+
+    /// Momentary states are coloured; the rest is a template image.
+    public var tint: Tint {
+        switch self {
+        case .removing, .snapshotSaved: .accent
+        case .autoSaved: .module("desmack")
+        case .off, .on, .problem: .template
+        }
+    }
+
+    public var isAccent: Bool { tint != .template }
 }
 
 /// Where the user's choices are remembered (UserDefaults in the app, in-memory in tests).
@@ -29,6 +48,8 @@ public enum MenuBarIconState: Equatable, Sendable {
 public protocol SettingsStore: AnyObject {
     func bool(_ key: String) -> Bool?
     func set(_ value: Bool, for key: String)
+    func int(_ key: String) -> Int?
+    func set(_ value: Int, for key: String)
 }
 
 /// `UserDefaults`-backed settings.
@@ -38,15 +59,20 @@ public final class DefaultsStore: SettingsStore {
     public init(_ defaults: UserDefaults = .standard) { self.defaults = defaults }
     public func bool(_ key: String) -> Bool? { defaults.object(forKey: key) as? Bool }
     public func set(_ value: Bool, for key: String) { defaults.set(value, forKey: key) }
+    public func int(_ key: String) -> Int? { defaults.object(forKey: key) as? Int }
+    public func set(_ value: Int, for key: String) { defaults.set(value, forKey: key) }
 }
 
 /// In-memory settings for tests and previews.
 @MainActor
 public final class MemoryStore: SettingsStore {
     public var values: [String: Bool] = [:]
+    public var ints: [String: Int] = [:]
     public init() {}
     public func bool(_ key: String) -> Bool? { values[key] }
     public func set(_ value: Bool, for key: String) { values[key] = value }
+    public func int(_ key: String) -> Int? { ints[key] }
+    public func set(_ value: Int, for key: String) { ints[key] = value }
 }
 
 /// View model for the menu bar. Owns no audio state; it polls the engine.
@@ -67,6 +93,9 @@ public final class AppModel {
     private var flashUntil: Date = .distantPast
     private var flashState: MenuBarIconState = .on
     private var lastTriggers: UInt64 = 0
+    private var lastAutoSaved = 0
+    /// Auto-saving de-smack catches (Settings tab; ADR 0018). Off by default.
+    public private(set) var autoCapture: AutoCaptureSettings
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var waveTimer: Timer?
     @ObservationIgnored private var waveCursor: UInt64 = 0
@@ -105,8 +134,19 @@ public final class AppModel {
             if restored { moduleSettings.enabledChanged() }
         }
         self.launchAtLogin = loginItem?.isEnabled ?? false
+        // Auto-save: the engine starts at the defaults, so only remembered choices are pushed.
+        let limits = engine.autoCaptureLimits
+        let d = limits.defaults
+        let stored = AutoCaptureSettings(
+            enabled: settings?.bool(Self.autoEnabledKey) ?? d.enabled,
+            dailyCap: settings?.int(Self.autoCapKey) ?? d.dailyCap,
+            retentionDays: settings?.int(Self.autoRetentionKey) ?? d.retentionDays
+        ).clamped(to: limits)
+        self.autoCapture = stored
+        if stored != d { engine.setAutoCapture(stored) }
         self.snapshot = engine.snapshot()
         self.lastTriggers = snapshot.totalTriggers
+        self.lastAutoSaved = snapshot.autoSavedSession
         updateIcon(now: Date())
     }
 
@@ -118,6 +158,10 @@ public final class AppModel {
             flash(.removing, for: 0.5, now: now)
         }
         lastTriggers = triggers
+        if snapshot.autoSavedSession > lastAutoSaved {
+            flash(.autoSaved, for: 1.2, now: now)
+        }
+        lastAutoSaved = snapshot.autoSavedSession
         updateIcon(now: now)
     }
 
@@ -209,8 +253,8 @@ public final class AppModel {
     }
 
     private func flash(_ state: MenuBarIconState, for seconds: TimeInterval, now: Date) {
-        // A snapshot confirmation wins over a removal glow.
-        if flashUntil > now, flashState == .snapshotSaved, state == .removing { return }
+        // A save confirmation wins over a removal glow.
+        if flashUntil > now, flashState == .snapshotSaved || flashState == .autoSaved, state == .removing { return }
         flashState = state
         flashUntil = now.addingTimeInterval(seconds)
     }
@@ -228,6 +272,23 @@ public final class AppModel {
     }
 
     public var snapshotFolder: URL { engine.snapshotFolder }
+
+    static let autoEnabledKey = "autoCapture.enabled"
+    static let autoCapKey = "autoCapture.dailyCap"
+    static let autoRetentionKey = "autoCapture.retentionDays"
+
+    /// Limits for the settings UI.
+    public var autoCaptureLimits: AutoCaptureLimits { engine.autoCaptureLimits }
+
+    /// Change the auto-save settings (clamped), remember them and hand them to the engine.
+    public func setAutoCapture(_ new: AutoCaptureSettings) {
+        let s = new.clamped(to: engine.autoCaptureLimits)
+        autoCapture = s
+        settings?.set(s.enabled, for: Self.autoEnabledKey)
+        settings?.set(s.dailyCap, for: Self.autoCapKey)
+        settings?.set(s.retentionDays, for: Self.autoRetentionKey)
+        engine.setAutoCapture(s)
+    }
 
     /// Set one module parameter (live) and remember it.
     public func setParam(_ module: String, _ param: String, _ value: Float) {

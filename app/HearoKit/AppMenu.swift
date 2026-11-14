@@ -212,13 +212,22 @@ public struct MenuBarLabel: View {
     let model: AppModel
     @Environment(\.openWindow) private var openWindow
     @State private var rightClick: StatusItemRightClick?
+    @Environment(\.colorScheme) private var scheme
 
     public init(model: AppModel) { self.model = model }
+
+    private var color: Color {
+        switch model.iconState.tint {
+        case .template: .primary
+        case .accent: .accentColor
+        case .module(let key): ModuleStyle.color(key, scheme)
+        }
+    }
 
     public var body: some View {
         Image(systemName: model.menuBarSymbol)
             .symbolRenderingMode(model.iconState.isAccent ? .palette : .monochrome)
-            .foregroundStyle(model.iconState.isAccent ? Color.accentColor : Color.primary)
+            .foregroundStyle(color)
             .accessibilityLabel("hEARo")
             .onAppear {
                 let open = openWindow

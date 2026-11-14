@@ -31,7 +31,7 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>© 2026 The hEARo contributors</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>hEARo listens to the sound your Mac plays so it can smooth out clicks, mouth smacks, harsh "s" sounds and hum before they reach your ears. Everything happens on this Mac, in real time: nothing is recorded or sent anywhere. The only exception is a short snapshot you save yourself with the snapshot hotkey, and it stays on this Mac.</string>
+	<string>hEARo listens to the sound your Mac plays so it can smooth out clicks, mouth smacks, harsh "s" sounds and hum before they reach your ears. Everything happens on this Mac, in real time: nothing is recorded or sent anywhere. The only exceptions are short snapshots you save yourself with the snapshot hotkey and, if you turn it on in Settings, short clips around removed mouth smacks. Both stay on this Mac.</string>
 	<key>HearoGitSHA</key>
 	<string>unknown</string>
 	<key>HearoBuildConfiguration</key>

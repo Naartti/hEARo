@@ -30,6 +30,7 @@ file records decisions and the current state.
   | On, processing audio | `ear.fill` | template, subtle steady state |
   | **Just removed something** (smack, click, ...) | `ear.fill` | **accent colour glow for ~0.5 s**, then back; bursts coalesce |
   | Snapshot saved (`§`) | `ear.badge.checkmark` | accent, ~1.2 s |
+  | Auto-saved a de-smack catch | `ear.badge.checkmark` | **de-smack colour** (orange-red), ~1.2 s |
   | Problem (permission denied, fallback) | `ear.trianglebadge.exclamationmark` | template |
 
   Colour is only used for *momentary* events, so the icon stays a calm template image the rest
@@ -191,7 +192,8 @@ the stroke is coloured from the outside in and the uncoloured grey **core** is w
 ## Copy
 
 - Permission prompt (`NSAudioCaptureUsageDescription`): explains local-only processing and that
-  only user-saved snapshots are stored.
+  only user-saved snapshots — and, if turned on in Settings, clips around removed smacks — are
+  stored.
 - Tone: friendly, plain, a little heroic ("Saved — thanks, hero").
 
 ## Labeling hotkey (decided with the human, 2026-11-13)
@@ -207,6 +209,35 @@ the stroke is coloured from the outside in and the uncoloured grey **core** is w
     plus a small HUD "Saved — thanks, hero"; under Reduce Motion a static badge for ~1 s.
 - Snapshots keep 8 s ending at the press; the smack is usually 0.5–2 s before it
   (`event_hint_s` in the sidecar), which narrows labeling and training targets.
+
+## Auto-saved de-smack catches (human request 2026-11-14)
+
+"When [de-smack is] active and triggering, can't we just add those to the dataset automatically
+… labelled as auto-caught … unverified, but easier to double check and verify." Then: in
+Settings, default off; flash the ear orange (the smack colour) when one is saved; adjustable
+daily cap (default 250) and auto-delete (default 31 days); catches close together share a clip;
+the detection pre-marked with start and end; clear keyboard shortcuts to verify or mark a false
+positive — "which is an important dataset also". Privacy is fine for them (local only).
+
+- **Settings tab**, section *Auto-save de-smack catches*: a toggle (off by default), *Daily
+  limit* (1–2000, default 250; a rolling 24 h window, so it behaves the same across restarts and
+  time zones), *Delete unreviewed auto-saved clips after* (1–365 days, default 31), and a line
+  "N saved in the last 24 hours". Clips you reviewed are never auto-deleted; neither are `§`
+  snapshots. Stored with the app's other preferences (UserDefaults); Rust clamps the values.
+- **Capture:** an 8 s clip ending 3 s after the last catch in a burst; catches within ~4.5 s of
+  the first share one clip. Saved as label `auto` with the catches as `proposals` (same format
+  as `hearo dataset propose`: start and end, class `lip_smack`, module, dB removed).
+- **Icon:** `ear.badge.checkmark` in the de-smack colour for ~1.2 s (a `§` snapshot keeps the
+  accent colour, so the two are distinguishable at a glance).
+- **Review tab:** the list shows *Auto* clips. **A** = accept the detection (it *is* a smack →
+  a region), **X** = false positive (stored in the sidecar's `rejected` list: de-smack's
+  mistakes, the hard negatives). Both act on the proposal you last showed, else the first
+  undecided one; pressing the other key flips a decision. The proposal rows carry the same two
+  buttons with their shortcuts in the label ("Accept (A)", "False positive (X)"), and a hint
+  line names the flow: *A accept · X false positive · Return reviewed & next*. Rejected
+  proposals are drawn grey and crossed out.
+- **Permission text** now names the opt-in auto-save as the second exception to "nothing is
+  recorded".
 
 ## Snapshot review & annotation window (M6) — requirements from the human, 2026-11-13
 

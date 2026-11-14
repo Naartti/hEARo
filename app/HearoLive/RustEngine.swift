@@ -30,7 +30,23 @@ public final class RustEngine: HearoKit.Engine {
                              gainReductionDb: $0.gainReductionDb)
             })
         snap.problem = s.problem
+        snap.autoSavedSession = Int(s.autoSavedSession)
+        snap.autoSavedLast24h = Int(s.autoSavedLast24h)
         return snap
+    }
+
+    public func setAutoCapture(_ settings: HearoKit.AutoCaptureSettings) {
+        core.setAutoCapture(
+            config: HearoFFI.AutoCaptureConfig(
+                enabled: settings.enabled, dailyCap: UInt32(clamping: settings.dailyCap),
+                retentionDays: UInt32(clamping: settings.retentionDays)))
+    }
+
+    public var autoCaptureLimits: HearoKit.AutoCaptureLimits {
+        let l = HearoFFI.autoCaptureLimits()
+        return HearoKit.AutoCaptureLimits(
+            defaultDailyCap: Int(l.defaultDailyCap), maxDailyCap: Int(l.maxDailyCap),
+            defaultRetentionDays: Int(l.defaultRetentionDays), maxRetentionDays: Int(l.maxRetentionDays))
     }
 
     public func setRunning(_ on: Bool) throws {

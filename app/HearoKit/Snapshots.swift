@@ -72,6 +72,31 @@ public struct Proposal: Equatable, Sendable, Identifiable {
     public var inPressWindow: Bool
 }
 
+/// A detector proposal the human marked as a false positive (sidecar `rejected`): what the
+/// detector got wrong, kept as a hard negative for training (ADR 0018).
+public struct RejectedSpan: Equatable, Sendable {
+    public var start: Double
+    public var end: Double
+    public var classString: String
+    public var module: String
+
+    public init(start: Double, end: Double, classString: String, module: String) {
+        self.start = start
+        self.end = end
+        self.classString = classString
+        self.module = module
+    }
+}
+
+/// What the human decided about a proposal.
+public enum ProposalDecision: Equatable, Sendable {
+    case undecided
+    /// It is what the detector said (a region with its span exists).
+    case accepted
+    /// False positive (in `rejected`).
+    case rejected
+}
+
 /// One snapshot on disk, as shown in the list.
 public struct SnapshotInfo: Identifiable, Equatable, Sendable {
     public var id: String { stem }
@@ -89,6 +114,7 @@ public struct SnapshotInfo: Identifiable, Equatable, Sendable {
         switch label {
         case "missed": "Missed"
         case "false_hit": "False hit"
+        case "auto": "Auto"
         default: label
         }
     }
@@ -198,11 +224,13 @@ public struct Annotation: Equatable, Sendable {
     public var pressAt: Double?
     public var proposals: [Proposal]
     public var regions: [Region]
+    /// Proposals marked as false positives.
+    public var rejected: [RejectedSpan]
     public var reviewed: Bool
 
     public init(
         duration: Double, sampleRate: Double, hint: ClosedRange<Double>? = nil, pressAt: Double? = nil,
-        proposals: [Proposal] = [], regions: [Region] = [], reviewed: Bool = false
+        proposals: [Proposal] = [], regions: [Region] = [], rejected: [RejectedSpan] = [], reviewed: Bool = false
     ) {
         self.duration = duration
         self.sampleRate = sampleRate
@@ -210,6 +238,7 @@ public struct Annotation: Equatable, Sendable {
         self.pressAt = pressAt
         self.proposals = proposals
         self.regions = regions
+        self.rejected = rejected
         self.reviewed = reviewed
     }
 
@@ -239,17 +268,29 @@ public struct Annotation: Equatable, Sendable {
             guard let s = Self.double(r["start_s"]), let e = Self.double(r["end_s"]) else { return nil }
             return Region(start: min(s, e), end: max(s, e), cls: RegionClass(sidecar: r["class"] as? String))
         }
+        let rejected = (sidecar["rejected"] as? [[String: Any]] ?? []).compactMap { r -> RejectedSpan? in
+            guard let s = Self.double(r["start_s"]), let e = Self.double(r["end_s"]) else { return nil }
+            return RejectedSpan(
+                start: min(s, e), end: max(s, e), classString: r["class"] as? String ?? "other",
+                module: r["module"] as? String ?? "")
+        }
         self.init(
             duration: secs, sampleRate: sr, hint: hint ?? Self.defaultHint(Self.double(sidecar["seconds"]) ?? secs),
-            pressAt: Self.double(sidecar["press_at_s"]), proposals: proposals, regions: regions,
+            pressAt: Self.double(sidecar["press_at_s"]), proposals: proposals, regions: regions, rejected: rejected,
             reviewed: sidecar["reviewed"] as? Bool ?? false)
     }
 
-    /// The sidecar with our keys (`regions`, `reviewed`) replaced and everything else untouched.
+    /// The sidecar with our keys (`regions`, `rejected`, `reviewed`) replaced and everything else
+    /// untouched.
     public func merged(into sidecar: [String: Any]) -> [String: Any] {
         var out = sidecar
         out["regions"] = regions.sorted { $0.start < $1.start }.map { r -> [String: Any] in
             ["start_s": Self.round6(r.start), "end_s": Self.round6(r.end), "class": r.cls.rawValue]
+        }
+        if !rejected.isEmpty || sidecar["rejected"] != nil {
+            out["rejected"] = rejected.sorted { $0.start < $1.start }.map { r -> [String: Any] in
+                ["start_s": Self.round6(r.start), "end_s": Self.round6(r.end), "class": r.classString, "module": r.module]
+            }
         }
         if reviewed || sidecar["reviewed"] != nil { out["reviewed"] = reviewed }
         return out
@@ -321,6 +362,8 @@ public struct Annotation: Equatable, Sendable {
     @discardableResult
     public mutating func accept(proposal index: Int) -> UUID? {
         guard let p = proposals.first(where: { $0.id == index }) else { return nil }
+        let tol = matchTolerance
+        rejected.removeAll { Self.matches($0, p, tol) }
         if let existing = acceptedRegion(for: p) { return existing.id }
         return addRegion(from: p.start, to: p.end, cls: p.cls)
     }
@@ -329,6 +372,33 @@ public struct Annotation: Equatable, Sendable {
     public func acceptedRegion(for p: Proposal) -> Region? {
         let tol = oneSample * 0.5 + 1e-6
         return regions.first { abs($0.start - snap(p.start)) <= tol && abs($0.end - snap(p.end)) <= tol }
+    }
+
+    private var matchTolerance: Double { oneSample * 0.5 + 1e-6 }
+
+    private static func matches(_ r: RejectedSpan, _ p: Proposal, _ tol: Double) -> Bool {
+        abs(r.start - p.start) <= tol && abs(r.end - p.end) <= tol
+    }
+
+    /// Accepted (a region with its span), rejected (a false positive), or neither.
+    public func decision(for p: Proposal) -> ProposalDecision {
+        if acceptedRegion(for: p) != nil { return .accepted }
+        let tol = matchTolerance
+        return rejected.contains { Self.matches($0, p, tol) } ? .rejected : .undecided
+    }
+
+    /// The first proposal (in sidecar order) nobody decided on yet.
+    public var firstUndecided: Int? { proposals.first { decision(for: $0) == .undecided }?.id }
+
+    /// Mark a proposal as a false positive: drop its accepted region, if any, and record its span
+    /// in `rejected` (once).
+    public mutating func reject(proposal index: Int) {
+        guard let p = proposals.first(where: { $0.id == index }) else { return }
+        if let r = acceptedRegion(for: p) { regions.removeAll { $0.id == r.id } }
+        let tol = matchTolerance
+        if !rejected.contains(where: { Self.matches($0, p, tol) }) {
+            rejected.append(RejectedSpan(start: p.start, end: p.end, classString: p.classString, module: p.module))
+        }
     }
 
     /// Edges win over insides (within `tolerance` seconds); the smallest region wins on overlap.

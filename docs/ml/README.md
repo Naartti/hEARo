@@ -25,6 +25,21 @@ and snapshots carry the real speakers, mics, rooms and codecs hEARo will process
 - Mark overlapped smacks (under speech or noise) too, even if messy: they are the honest test
   of the overlap case.
 
+### Auto-saved catches (ADR 0018)
+
+With *Settings → Auto-save de-smack catches* on, hEARo saves an 8 s clip around every de-smack
+catch (label `auto`, the catch pre-marked as a proposal). In Review, **A** accepts it (a region:
+a verified smack) and **X** marks it a false positive (the sidecar's `rejected` list). The same
+"reviewed = exhaustive" rule applies before Return.
+
+- Accepted catches are clean, isolated smacks: the best source for the **mixing pool**.
+- Rejected catches are de-smack's real mistakes (a final "t", a breath, an "s"): **hard
+  negatives** — train on them as "not a mouth noise" at exactly those spans.
+- Auto clips only contain what de-smack already finds, so they don't measure the overlap case:
+  keep the **test set** to hotkey clips you marked yourself.
+- Untouched auto clips are deleted after the retention set in Settings (default 31 days);
+  anything you reviewed or edited stays. `hearo dataset propose` skips auto clips.
+
 ### Using it
 
 - **Splits by recording day/session**, never by clip: the same people recur across meetings,

@@ -282,8 +282,11 @@ and `hEARoTests/SpectrogramTests.swift`.
   marker dashed, proposals as dashed outlines in their class colour, regions as translucent
   fills (lip smack red, mouth click orange, plosive purple, breath teal, filled pause blue,
   other gray), playhead line, time axis in s/ms. Zoom down to 2 ms across the view.
-- Proposals are also listed under the waveform with **Show** and **Accept** (accept = a region
-  with the proposal's span and class; accepting twice is a no-op).
+- Proposals are also listed under the waveform with **Show**, **Accept (A)** and **False
+  positive (X)** (accept = a region with the proposal's span and class; false positive = its
+  span in the sidecar's `rejected`; each is a no-op twice and flips the other). A / X act on the
+  shown proposal, else the first undecided one (marked ▸ in the list); the list header counts
+  what is left to verify (2026-11-14, see *Auto-saved de-smack catches*).
 - Region edges snap to the sample grid; the selection readout shows start–end (length) in ms.
 - Saving: every finished edit (drag release, class, delete, accept, reviewed) merges
   `regions` (`{start_s, end_s, class}`, sorted by start) and `reviewed` into the sidecar,

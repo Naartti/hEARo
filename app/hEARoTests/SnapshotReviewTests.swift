@@ -215,6 +215,39 @@ struct AnnotationTests {
         #expect(a.accept(proposal: 7) == nil)
     }
 
+    /// Auto-saved catches are verified (accept → a region) or marked false positives (reject →
+    /// `rejected`, the hard negatives); pressing the other key flips the decision.
+    @Test func rejectAndAcceptFlipAProposalsDecision() throws {
+        let props: [[String: Any]] = [
+            ["start_s": 2.0, "end_s": 2.02, "class": "lip_smack", "module": "desmack"],
+            ["start_s": 5.0, "end_s": 5.03, "class": "lip_smack", "module": "desmack"],
+        ]
+        var a = Annotation(sidecar: ["proposals": props], duration: 8, sampleRate: sr)
+        #expect(a.decision(for: a.proposals[0]) == .undecided)
+        #expect(a.firstUndecided == 0)
+        a.reject(proposal: 0)
+        #expect(a.decision(for: a.proposals[0]) == .rejected)
+        #expect(a.regions.isEmpty && a.rejected.count == 1)
+        #expect(a.firstUndecided == 1)
+        a.reject(proposal: 0)
+        #expect(a.rejected.count == 1, "rejecting twice is a no-op")
+        _ = a.accept(proposal: 0)
+        #expect(a.decision(for: a.proposals[0]) == .accepted && a.rejected.isEmpty)
+        a.reject(proposal: 0)
+        #expect(a.decision(for: a.proposals[0]) == .rejected && a.regions.isEmpty, "flipped back")
+        _ = a.accept(proposal: 1)
+        #expect(a.firstUndecided == nil)
+        // Saved as `rejected` and read back.
+        let out = a.merged(into: ["proposals": props])
+        let rej = try #require(out["rejected"] as? [[String: Any]])
+        #expect(rej.count == 1 && rej[0]["start_s"] as? Double == 2.0 && rej[0]["module"] as? String == "desmack")
+        let back = Annotation(sidecar: out, duration: 8, sampleRate: sr)
+        #expect(back.decision(for: back.proposals[0]) == .rejected)
+        #expect(back.decision(for: back.proposals[1]) == .accepted)
+        // Nothing rejected and never was: no key added.
+        #expect(Annotation(duration: 8, sampleRate: sr).merged(into: [:])["rejected"] == nil)
+    }
+
     @Test func hitTestingPrefersEdgesThenSmallestRegion() throws {
         var a = blank()
         let big = try req(a.addRegion(from: 1, to: 3))
@@ -377,6 +410,40 @@ struct ReviewModelTests {
         #expect(m.current?.stem == "snapshot-200-missed")
         m.setReviewed(false)
         #expect(try f.read("snapshot-200-missed")["reviewed"] as? Bool == false)
+    }
+
+    /// A / X act on the proposal last shown, else the first undecided one, and save at once.
+    @Test func acceptAndRejectShortcutsVerifyAutoClips() throws {
+        let f = try Fixture()
+        try f.wav("snapshot-400-auto", seconds: 8)
+        try f.json(
+            "snapshot-400-auto",
+            [
+                "label": "auto", "unix_time": 400, "seconds": 8.0,
+                "proposals": [
+                    ["start_s": 2.0, "end_s": 2.02, "class": "lip_smack", "module": "desmack"],
+                    ["start_s": 5.0, "end_s": 5.03, "class": "lip_smack", "module": "desmack"],
+                ],
+            ])
+        let m = ReviewModel(library: SnapshotLibrary(folder: f.dir))
+        m.reload()
+        #expect(m.current?.labelTitle == "Auto")
+        m.acceptNextProposal()  // the first undecided: 2.0 s
+        var side = try f.read("snapshot-400-auto")
+        #expect((side["regions"] as? [[String: Any]])?.first?["start_s"] as? Double == 2.0)
+        m.rejectNextProposal()  // the next undecided: 5.0 s
+        side = try f.read("snapshot-400-auto")
+        #expect((side["rejected"] as? [[String: Any]])?.first?["start_s"] as? Double == 5.0)
+        // Shown proposal wins: flip the first to a false positive.
+        m.showProposal(0)
+        m.rejectNextProposal()
+        side = try f.read("snapshot-400-auto")
+        #expect((side["regions"] as? [Any])?.isEmpty == true)
+        #expect((side["rejected"] as? [Any])?.count == 2)
+        #expect(m.clips[0].regionCount == 0)
+        // Nothing left to decide: the keys do nothing.
+        m.acceptNextProposal()
+        #expect((try f.read("snapshot-400-auto")["regions"] as? [Any])?.isEmpty == true)
     }
 
     @Test func zoomToRegion() throws {

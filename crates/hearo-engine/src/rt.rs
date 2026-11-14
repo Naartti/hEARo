@@ -15,7 +15,7 @@ use objc2_core_audio::AudioObjectID;
 use objc2_core_audio_types::{AudioBuffer, AudioBufferList, AudioTimeStamp};
 
 use crate::waveform::{ColumnBuilder, WaveformRing};
-use crate::{CaptureRing, Controls, MAX_PARAMS, MAX_SLOTS, Stats};
+use crate::{CaptureRing, Controls, EventRing, MAX_PARAMS, MAX_SLOTS, Stats};
 
 /// State owned by the audio thread while the IOProc runs.
 pub(crate) struct RtState {
@@ -27,6 +27,8 @@ pub(crate) struct RtState {
     stats: Arc<Stats>,
     capture: Option<Arc<CaptureRing>>,
     waveform: Option<(Arc<WaveformRing>, ColumnBuilder)>,
+    /// Where the chain's detection events go (auto-saving de-smack catches, ADR 0018).
+    events: Option<Arc<EventRing>>,
     applied_bypass: bool,
     applied_enabled: [bool; MAX_SLOTS],
     applied_gen: u32,
@@ -59,6 +61,7 @@ impl RtState {
             stats,
             capture,
             waveform: None,
+            events: None,
             applied_enabled,
             applied_gen: u32::MAX,
             poisoned: false,
@@ -71,6 +74,12 @@ impl RtState {
             (0..self.chain.len()).filter_map(|i| self.chain.module(i).map(|m| (m.id(), m.latency_samples()))).collect();
         let builder = ColumnBuilder::new(self.sample_rate, &slots);
         self.waveform = Some((ring, builder));
+        self
+    }
+
+    /// Publish the chain's events into `ring` (call before handing the state to Core Audio).
+    pub fn with_events(mut self, ring: Arc<EventRing>) -> Self {
+        self.events = Some(ring);
         self
     }
 
@@ -153,7 +162,10 @@ impl RtState {
             write_out(outs, offset, l, r);
             offset += n;
         }
-        // Events reach the UI in M5 (telemetry ring); until then they're dropped here.
+        // Events (with chain-input sample positions = capture-ring frames) to the control thread.
+        if let Some(ring) = &self.events {
+            ring.push_all(self.chain.telemetry().events());
+        }
         self.chain.telemetry_mut().clear_events();
         self.stats.set_faults(self.chain.faults());
         for id in hearo_dsp::ModuleId::ALL {
@@ -462,8 +474,10 @@ mod tests {
         let sr = 48_000.0;
         let (sig, smacks) = hearo_testkit::signals::speech_with_pause_smacks(sr, 8.0, 41, 5, (-18.0, -12.0), -55.0);
         let ring = Arc::new(crate::waveform::WaveformRing::default());
-        let mut st =
-            state(vec![Box::new(hearo_dsp::modules::desmack::DeSmack::new())], 512).with_waveform(ring.clone());
+        let events = Arc::new(EventRing::new(64));
+        let mut st = state(vec![Box::new(hearo_dsp::modules::desmack::DeSmack::new())], 512)
+            .with_waveform(ring.clone())
+            .with_events(events.clone());
         let mut tap = vec![0.0f32; 2 * 512];
         let mut out = vec![0.0f32; 2 * 512];
         let mut inp = FakeList::new(&mut [(2, Some(&mut tap))]);
@@ -494,6 +508,21 @@ mod tests {
         assert!(ducked.iter().any(|c| c.out_peak < 0.7 * c.peak), "output envelope shows the duck");
         let others = cols.iter().all(|c| c.gain_reduction_db.iter().enumerate().all(|(i, g)| i == row || *g == 0.0));
         assert!(others, "modules not in the chain report nothing");
+        // The catches left the audio thread through the event ring, at the smacks' input
+        // positions (the capture ring's frame clock), so a clip can be cut around them.
+        let mut got = Vec::new();
+        events.drain(&mut got);
+        assert!(!got.is_empty() && got.iter().all(|e| e.module == ModuleId::DeSmack));
+        let near = |e: &hearo_dsp::Event| {
+            smacks
+                .iter()
+                .any(|s| (e.start_sample as usize) + 480 >= s.start && e.start_sample as usize <= s.end() + 240)
+        };
+        assert!(
+            got.iter().all(near),
+            "event positions off the smacks: {:?}",
+            got.iter().map(|e| e.start_sample).collect::<Vec<_>>()
+        );
     }
 
     struct Panicky;

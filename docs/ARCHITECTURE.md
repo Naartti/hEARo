@@ -171,6 +171,14 @@ Packed into two `AtomicU64` per column (peaks as u16, reductions as u8 in 0.25 d
 Gain reduction is 0 for slots that are off or warming up and under global bypass. "Removed"
 (the old red flag, no longer drawn) = some module cut more than 1 dB; the app colours each module's share instead (DESIGN.md, *Module colours*).
 
+**Detection events** (`hearo_engine::events::EventRing`, 2026-11-14). After each cycle the IOProc
+copies the chain's events (module, kind, start sample, length, dB removed) into a 1024-slot
+lock-free SPSC ring (relaxed slot stores, published by a Release `head`; a full ring drops and
+counts, never waits) and clears them. `LiveEngine::drain_events` reads them on one control
+thread. An event's `start_sample` is on the chain's input clock, which is the capture ring's
+frame clock (both see every frame in the same chunks), so `LiveEngine::capture_window` can cut
+unprocessed audio around it — the basis of auto-saved de-smack catches (ADR 0018).
+
 ## Data layout
 
 `AudioBlock` is planar: one contiguous slice per channel (up to 8). The engine de-interleaves

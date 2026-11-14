@@ -63,7 +63,22 @@ impl CaptureRing {
         let cap = self.left.len();
         let end = self.written.load(Ordering::Acquire);
         let n = (frames as u64).min(end).min(cap as u64 / 2) as usize;
-        let start = end - n as u64;
+        self.copy(end - n as u64, n)
+    }
+
+    /// Copy frames `start..start + frames` by absolute frame number (the chain's sample clock,
+    /// e.g. an event's `start_sample`). `None` if any of it isn't written yet, is older than half
+    /// the ring (the writer may be about to overwrite it), or the writer lapped the copy.
+    /// Control thread only.
+    pub fn window(&self, start: u64, frames: usize) -> Option<(Vec<f32>, Vec<f32>)> {
+        let end = self.written.load(Ordering::Acquire);
+        let fits =
+            start.checked_add(frames as u64).is_some_and(|e| e <= end) && end - start <= self.left.len() as u64 / 2;
+        if fits { self.copy(start, frames) } else { None }
+    }
+
+    fn copy(&self, start: u64, n: usize) -> Option<(Vec<f32>, Vec<f32>)> {
+        let cap = self.left.len();
         let read = |ring: &[AtomicU32]| -> Vec<f32> {
             (0..n)
                 .map(|i| {
@@ -128,6 +143,22 @@ mod tests {
         assert_eq!(l, r);
         // Asking for more than half the ring is capped (leaves room for the writer).
         assert_eq!(ring.snapshot(1000).unwrap().0.len(), 50);
+    }
+
+    #[test]
+    fn window_copies_by_absolute_frame_and_refuses_unsafe_ranges() {
+        let ring = CaptureRing::new(100);
+        let data: Vec<f32> = (0..250).map(|i| i as f32).collect();
+        for chunk in data.chunks(33) {
+            ring.push(chunk, chunk);
+        }
+        let (l, r) = ring.window(210, 30).unwrap();
+        assert_eq!(l, (210..240).map(|i| i as f32).collect::<Vec<_>>());
+        assert_eq!(l, r);
+        assert!(ring.window(240, 20).is_none(), "not written yet");
+        assert!(ring.window(150, 10).is_none(), "older than half the ring");
+        assert!(ring.window(u64::MAX - 5, 10).is_none(), "a wrapped start is refused, not a panic");
+        assert_eq!(ring.window(200, 50).unwrap().0.len(), 50, "exactly half the ring is fine");
     }
 
     #[test]

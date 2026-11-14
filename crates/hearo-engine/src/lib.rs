@@ -8,6 +8,7 @@
 //! [`Controls`] and [`Stats`], and lock-free rings ([`CaptureRing`], [`EventRing`], the waveform).
 //! Everything else (setup, teardown, polling) is control-thread work.
 
+pub mod autocapture;
 pub mod capture;
 pub mod controls;
 pub mod events;

@@ -21,3 +21,4 @@ Template: [0000-template.md](0000-template.md). How to write one: `.claude/skill
 | [0015](0015-module-settings-and-reduction-columns.md) | Module settings owned by Rust; per-module GR columns | accepted |
 | [0016](0016-github-actions-ci-and-releases.md) | GitHub Actions for CI and releases, local gate stays first | accepted |
 | [0017](0017-dataset-from-hotkey-snapshots.md) | Mouth-noise dataset from hotkey snapshots, not a recording session | accepted |
+| [0018](0018-auto-save-desmack-catches.md) | Auto-save de-smack catches (opt-in) | accepted |

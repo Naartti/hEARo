@@ -295,6 +295,15 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
       pinning enforced by `check-files.sh`, `just coverage` (Rust ≈ 86 % regions locally), README
       header/badges/screenshots (WebP, video cropped out), INSTALL.md for downloads, AGENTS.md
       step 8 → PR. Ad-hoc release + DMG built and checked locally (`Signature=adhoc`, no Team ID).
+  - Review (code-review, medium): fixed — release gating (tag on `main` + green CI, RC →
+    pre-release), read-only build job / tag-only publish job, pin check (quotes, Docker
+    digests, `@main # @<sha>` comment trick), signing-identity rule in one `lib.sh` helper; added
+    actionlint + shellcheck to `just ci`. Rejected: coverage as a separate job duplicates the
+    test run — kept so the gate stays exactly `just ci` and both run in parallel on free
+    runners; the tag check's `grep '^version'` copy of build-app.sh — `[workspace.package]` is
+    the only such line, and a mismatch fails loudly at the tag check.
+  - [ ] Hosted runs blocked: "account is locked due to a billing issue" (owner fixes in GitHub
+        billing); then re-run PR #1's checks.
   - [ ] First release: tag `v0.1.0` once the human says so (the `release` skill).
   - [ ] Swift coverage (`swift test --enable-code-coverage`) not measured yet.
 - [ ] **De-uhm (filled pauses: "uhm", "eh", Swedish "öh")** — low priority (human, 2026-11-13).

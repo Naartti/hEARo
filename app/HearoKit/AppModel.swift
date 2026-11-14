@@ -134,7 +134,8 @@ public final class AppModel {
             if restored { moduleSettings.enabledChanged() }
         }
         self.launchAtLogin = loginItem?.isEnabled ?? false
-        // Auto-save: the engine starts at the defaults, so only remembered choices are pushed.
+        // Auto-save: always handed over at launch — the engine sweeps old auto clips only once
+        // it has the user's retention.
         let limits = engine.autoCaptureLimits
         let d = limits.defaults
         let stored = AutoCaptureSettings(
@@ -143,7 +144,7 @@ public final class AppModel {
             retentionDays: settings?.int(Self.autoRetentionKey) ?? d.retentionDays
         ).clamped(to: limits)
         self.autoCapture = stored
-        if stored != d { engine.setAutoCapture(stored) }
+        engine.setAutoCapture(stored)
         self.snapshot = engine.snapshot()
         self.lastTriggers = snapshot.totalTriggers
         self.lastAutoSaved = snapshot.autoSavedSession

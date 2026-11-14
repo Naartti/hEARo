@@ -47,7 +47,7 @@ struct AppModelTests {
         model.setOn(true)
         model.setModule("deess", enabled: false)
         model.setBypass(true)
-        #expect(engine.calls == ["running=true", "deess=false", "bypass=true"])
+        #expect(engine.calls == ["autoCapture=false/250/31", "running=true", "deess=false", "bypass=true"])
         #expect(model.snapshot.modules.first { $0.id == "deess" }?.enabled == false)
         #expect(model.statusLine.hasSuffix("· bypassed"))
     }
@@ -109,7 +109,7 @@ struct AppModelTests {
         let engine = FakeEngine(.previewRunning)
         let model = AppModel(engine: engine, settings: store)
         #expect(model.autoCapture == AutoCaptureSettings(enabled: false, dailyCap: 250, retentionDays: 31))
-        #expect(!engine.calls.contains { $0.hasPrefix("autoCapture") }, "defaults aren't pushed needlessly")
+        #expect(engine.calls == ["autoCapture=false/250/31"], "handed over at launch (unlocks expiry)")
         model.setAutoCapture(AutoCaptureSettings(enabled: true, dailyCap: 100, retentionDays: 7))
         #expect(engine.calls.last == "autoCapture=true/100/7")
         // Next launch: restored and handed to the engine before anything runs.

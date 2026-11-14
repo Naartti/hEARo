@@ -223,7 +223,7 @@ positive — "which is an important dataset also". Privacy is fine for them (loc
   limit* (1–2000, default 250; a rolling 24 h window, so it behaves the same across restarts and
   time zones), *Delete unreviewed auto-saved clips after* (1–365 days, default 31), and a line
   "N saved in the last 24 hours". Clips you reviewed are never auto-deleted; neither are `§`
-  snapshots. Stored with the app's other preferences (UserDefaults); Rust clamps the values.
+  snapshots. A changed retention deletes nothing for an hour (time to fix a typo). Stored with the app's other preferences (UserDefaults); Rust clamps the values.
 - **Capture:** an 8 s clip ending 3 s after the last catch in a burst; catches within ~4.5 s of
   the first share one clip. Saved as label `auto` with the catches as `proposals` (same format
   as `hearo dataset propose`: start and end, class `lip_smack`, module, dB removed).

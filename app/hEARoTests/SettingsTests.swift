@@ -105,7 +105,8 @@ struct SettingsStoreTests {
         #expect(engine.settings().module("desmack")?.value("range") == 6)
         #expect(model.snapshot.modules.first { $0.id == "declick" }?.enabled == false)
         model.setOn(true)
-        #expect(Array(engine.calls.prefix(3)) == ["applySettings", "applySettings", "running=true"])
+        let moduleCalls = engine.calls.filter { !$0.hasPrefix("autoCapture") }  // handed over at launch too
+        #expect(Array(moduleCalls.prefix(3)) == ["applySettings", "applySettings", "running=true"])
         model.setModule("deess", enabled: false)
         model.moduleSettings.flush()
         #expect(store.stored?.module("deess")?.enabled == false)

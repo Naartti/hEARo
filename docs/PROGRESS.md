@@ -277,10 +277,26 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
   - [x] History squashed to one anonymous initial commit (2026-11-14, owner's request): author
         `naartti` with a GitHub noreply address; old history, tags `m0-done`/`m1-done` and
         reflogs removed. `.github/CODEOWNERS` → @naartti.
-  - [ ] Owner: check the `dev.hearo` bundle-id prefix; set `repository` in Cargo.toml once the
-        GitHub URL exists.
+  - [ ] Owner: check the `dev.hearo` bundle-id prefix. (`repository` set in Cargo.toml and
+        inherited by every crate, 2026-11-14.)
   - [ ] Proposals: move HANDOVER/PROGRESS/OPEN_QUESTIONS to docs/project/; crates inherit
         authors/repository once a URL exists; ARCHITECTURE crate table misses hearo-bindgen.
+- [ ] **Proper open-source project on GitHub (human request, 2026-11-14):** "looks like and
+      behaves like a proper open source project"; PRs are nice; Actions are free for public
+      repos. Acceptance: (a) GitHub Actions runs the full gate on every PR and push to `main`
+      (ADR 0016 supersedes 0009; the local gate and hooks stay); (b) a `v*` tag builds the app in
+      CI and publishes a GitHub Release with a downloadable DMG, so another Mac (or anyone) can
+      install without cloning; (c) the README shows the app icon, badges (CI, release, coverage,
+      licence, platform) and screenshots; (d) test coverage is measured (`just coverage`, CI);
+      (e) the agent workflow ends in a PR instead of a local merge.
+      Done on `ci/github-actions-and-releases`: `ci.yml` (just ci + coverage on `macos-26`),
+      `release.yml` (ad-hoc signed DMG + sha256 + provenance → GitHub Release; ad-hoc because
+      the dev certificate carries the owner's name), Dependabot, release-note categories, SHA
+      pinning enforced by `check-files.sh`, `just coverage` (Rust ≈ 86 % regions locally), README
+      header/badges/screenshots (WebP, video cropped out), INSTALL.md for downloads, AGENTS.md
+      step 8 → PR. Ad-hoc release + DMG built and checked locally (`Signature=adhoc`, no Team ID).
+  - [ ] First release: tag `v0.1.0` once the human says so (the `release` skill).
+  - [ ] Swift coverage (`swift test --enable-code-coverage`) not measured yet.
 - [ ] **De-uhm (filled pauses: "uhm", "eh", Swedish "öh")** — low priority (human, 2026-11-13).
       Real time can't remove time, so the module *ducks* fillers (e.g. −12…−20 dB with soft
       fades) rather than cutting them. Needs an ML detector (voiced, speech-like) → M7/M8 after

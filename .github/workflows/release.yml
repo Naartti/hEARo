@@ -18,6 +18,9 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  XCODE_VERSION: '26.6' # keep in step with ci.yml: the Xcode the gate tested
+
 jobs:
   build:
     name: build
@@ -57,6 +60,8 @@ jobs:
           version: 2026.11.2
           install: true
           cache: true
+      - name: Select Xcode
+        run: sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app" && xcodebuild -version
       - name: Build, sign ad-hoc and package
         env:
           ALLOW_ADHOC: '1'

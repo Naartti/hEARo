@@ -2,7 +2,8 @@ import HearoKit
 import HearoLive
 import SwiftUI
 
-/// Entry point. Menu-bar only (LSUIElement); all UI lives in HearoKit.
+/// Entry point. Menu-bar only (LSUIElement) until the hEARo window opens, then a regular app with
+/// a Dock icon until it closes (`openMainWindow`); all UI lives in HearoKit.
 @main
 struct HearoApp: App {
     @State private var model: AppModel
@@ -41,8 +42,8 @@ struct HearoApp: App {
         .menuBarExtraStyle(.window)
 
         // The one window: Controls (the popover kept open) · Review snapshots · Settings, as
-        // toolbar tabs. Opened from the popover or the menus, never at launch. A plain `Window`
-        // (not the `Settings` scene): an LSUIElement app has no app menu to open Settings from.
+        // toolbar tabs. Opened from the popover or the menus, never at launch. A plain `Window`,
+        // not the `Settings` scene: settings are a tab of this one window (app menu Settings… ⌘,).
         Window("hEARo", id: mainWindowID) {
             MainWindowView(model: model, review: review)
         }
@@ -50,5 +51,7 @@ struct HearoApp: App {
         .defaultWindowPlacement { _, _ in WindowPlacement(size: model.mainTab.defaultSize) }
         .windowResizability(.contentMinSize)
         .defaultLaunchBehavior(.suppressed)
+        // Shown while the window is open (hEARo is then a regular app with a Dock icon).
+        .commands { MainWindowCommands(model: model) }
     }
 }

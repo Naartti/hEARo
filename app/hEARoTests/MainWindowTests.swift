@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -34,13 +35,32 @@ struct MainWindowTests {
         #expect(!model.isPollingWaveform)
     }
 
-    /// Every route into the window selects the tab first, then opens the window and activates
-    /// the menu-bar-only app (otherwise the window opens behind the frontmost app).
-    @Test func openMainWindowSelectsTheTabOpensAndActivates() {
+    /// Every route into the window selects the tab first, makes hEARo a regular app (Dock icon,
+    /// ⌘Tab, menu bar), then opens the window and activates the app (otherwise the window opens
+    /// behind the frontmost app). The policy changes before activation so the menu bar appears.
+    @Test func openMainWindowSelectsTheTabShowsInDockOpensAndActivates() {
         let model = AppModel(engine: FakeEngine(.previewRunning))
         var log: [String] = []
-        model.openMainWindow(.settings, open: { log.append("open \($0) on \(model.mainTab)") }, activate: { log.append("activate") })
-        #expect(log == ["open main on settings", "activate"])
+        model.openMainWindow(
+            .settings, setPolicy: { log.append("policy \($0 == .regular ? "regular" : "accessory")") },
+            open: { log.append("open \($0) on \(model.mainTab)") }, activate: { log.append("activate") })
+        #expect(log == ["policy regular", "open main on settings", "activate"])
+    }
+
+    /// Closing the window takes hEARo back to menu-bar-only: no Dock icon, not in ⌘Tab.
+    @Test func closingTheMainWindowLeavesTheDock() {
+        let model = AppModel(engine: FakeEngine(.previewRunning))
+        var policies: [NSApplication.ActivationPolicy] = []
+        model.mainWindowClosed(setPolicy: { policies.append($0) })
+        #expect(policies == [.accessory])
+    }
+
+    /// The View menu lists the tabs with ⌘1–⌘3, and the app menu's Settings… (⌘,) opens the
+    /// Settings tab — the window's menu bar, shown while hEARo is in the Dock.
+    @Test func menuBarCommandsCoverTheTabsAndSettings() {
+        #expect(MainWindowCommands.viewItems.map(\.title) == ["Controls", "Review", "Settings"])
+        #expect(MainWindowCommands.viewItems.map(\.shortcut) == ["1", "2", "3"])
+        #expect(MainWindowCommands.settingsTab == .settings)
     }
 
     /// A second live view joining doesn't restart the poll; Reduce Motion in either slows it.

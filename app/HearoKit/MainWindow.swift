@@ -49,17 +49,72 @@ public enum LiveViewer: Hashable, Sendable {
 }
 
 extension AppModel {
-    /// Open (or bring forward) the hEARo window on `tab`. hEARo is menu-bar-only (LSUIElement),
-    /// so the app is activated too, or the window would open behind the frontmost app.
+    /// Open (or bring forward) the hEARo window on `tab`. hEARo is menu-bar-only (LSUIElement)
+    /// until then; while the window is open it is a regular app — Dock icon, ⌘Tab, its own menu
+    /// bar (human request 2026-11-14) — and it is activated, or the window would open behind
+    /// the frontmost app.
     public func openMainWindow(_ tab: MainTab, using openWindow: OpenWindowAction) {
         openMainWindow(tab, open: { openWindow(id: $0) })
     }
 
-    /// Testable core of `openMainWindow(_:using:)`: select, open, activate — in that order.
-    func openMainWindow(_ tab: MainTab, open: (String) -> Void, activate: () -> Void = { NSApp?.activate() }) {
+    /// Testable core of `openMainWindow(_:using:)`: select, show in the Dock, open, activate —
+    /// in that order (the policy must change before activation, or the menu bar doesn't appear).
+    func openMainWindow(
+        _ tab: MainTab, setPolicy: (NSApplication.ActivationPolicy) -> Void = { _ = NSApp?.setActivationPolicy($0) },
+        open: (String) -> Void, activate: () -> Void = { NSApp?.activate() }
+    ) {
         show(tab)
+        setPolicy(.regular)
         open(mainWindowID)
         activate()
+    }
+
+    /// The hEARo window closed: back to menu-bar-only (no Dock icon, not in ⌘Tab).
+    func mainWindowClosed(setPolicy: (NSApplication.ActivationPolicy) -> Void = { _ = NSApp?.setActivationPolicy($0) }) {
+        setPolicy(.accessory)
+    }
+}
+
+/// The menu bar hEARo shows while its window is open (and so it is a regular app): a View menu
+/// with the tabs (⌘1–⌘3) and the app menu's Settings… (⌘,) opening the Settings tab. Each item
+/// opens the window on its tab, so it works whether or not the window is key.
+public struct MainWindowCommands: Commands {
+    /// The View menu's tab items, in toolbar order.
+    static let viewItems = MainTab.allCases
+    /// The tab the app menu's Settings… opens.
+    static let settingsTab = MainTab.settings
+
+    let model: AppModel
+
+    public init(model: AppModel) { self.model = model }
+
+    public var body: some Commands {
+        CommandGroup(replacing: .appInfo) {
+            Button(AppMenu.Item.about.title) { AppMenu.showAbout() }
+        }
+        CommandGroup(replacing: .appSettings) {
+            OpenTabButton(model: model, tab: Self.settingsTab, title: "Settings…", shortcut: ",")
+        }
+        CommandGroup(before: .toolbar) {
+            ForEach(Self.viewItems) { tab in
+                OpenTabButton(model: model, tab: tab, title: tab.title, shortcut: tab.shortcut)
+            }
+            Divider()
+        }
+    }
+}
+
+/// A menu command that opens the hEARo window on a tab (a view, for the scene's `openWindow`).
+private struct OpenTabButton: View {
+    let model: AppModel
+    let tab: MainTab
+    let title: String
+    let shortcut: Character
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        Button(title) { model.openMainWindow(tab, using: openWindow) }
+            .keyboardShortcut(KeyEquivalent(shortcut), modifiers: .command)
     }
 }
 
@@ -98,7 +153,10 @@ public struct MainWindowView: View {
             .background(
                 WindowObserver(
                     attached: { window = $0 }, onScreen: { onScreen = $0 },
-                    willClose: { review.windowClosed() }))
+                    willClose: {
+                        review.windowClosed()
+                        model.mainWindowClosed()
+                    }))
             .onChange(of: model.mainTab) { old, new in resize(from: old, to: new) }
             .navigationTitle("hEARo")
             // The tabs are the toolbar; the title text would crowd them into an overflow menu
@@ -115,17 +173,8 @@ public struct MainWindowView: View {
                     .labelsHidden()
                     .fixedSize()
                     .accessibilityLabel("hEARo section")
+                    // ⌘1–⌘3 live in the View menu (`MainWindowCommands`).
                     .help("Controls ⌘1 · Review ⌘2 · Settings ⌘3")
-                }
-            }
-            .background {
-                // ⌘1–⌘3 switch tabs (an LSUIElement app has no View menu to carry them).
-                ForEach(MainTab.allCases) { tab in
-                    Button(tab.title) { model.show(tab) }
-                        .keyboardShortcut(KeyEquivalent(tab.shortcut), modifiers: .command)
-                        .opacity(0)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
                 }
             }
     }

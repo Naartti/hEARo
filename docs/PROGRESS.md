@@ -242,6 +242,14 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
       `MainWindow.swift`, `ControlsView` (was `PopoverView`), menu entry "Open hEARo Window".
   - [ ] Found while verifying (on `main` too): the open popover / Controls tab costs ≈ 40 %
         of a core (app 18 % → 58 % in `top`, processing on) — profile the 30 Hz waveform redraw.
+- [x] **Dock icon while the window is open (human request 2026-11-14):** "if it's best practice
+      then we should". Acceptance: (a) no Dock icon, not in ⌘Tab, no menu bar while only the
+      menu bar icon/popover is in use, and none at launch; (b) opening the hEARo window by any
+      route shows the Dock icon, puts hEARo in ⌘Tab and shows its menu bar; (c) closing the
+      window removes them again; (d) the menu bar has About hEARo, Settings… ⌘, (Settings tab)
+      and View → Controls/Review/Settings ⌘1–⌘3. `MainWindowCommands`,
+      `AppModel.openMainWindow` / `mainWindowClosed`; DESIGN.md *Dock icon while the window is
+      open*.
 - [x] **Spectrogram in the review window (2026-11-14):** log-frequency (30 Hz–20 kHz) magma
       lane under the waveform, sharing viewport/playhead/axis; marking, zoom and regions work on
       both lanes. ⇧⌘S / header toggle (remembered); resolution menu time 512 / balanced 1024 /

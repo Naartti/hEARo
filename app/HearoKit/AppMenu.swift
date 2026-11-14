@@ -46,12 +46,7 @@ public struct AppMenu {
 
     public func perform(_ item: Item) {
         switch item {
-        case .about:
-            NSApp?.activate()
-            NSApp?.orderFrontStandardAboutPanel(options: [
-                .version: AboutInfo.version(info: Bundle.main.infoDictionary ?? [:]),
-                .credits: AboutInfo.credits(),
-            ])
+        case .about: Self.showAbout()
         case .window: show(.controls)
         case .review: show(.review)
         case .advanced: show(.settings)
@@ -64,6 +59,16 @@ public struct AppMenu {
             NSApplication.shared.terminate(nil)
         case .divider: break
         }
+    }
+
+    /// The About panel with hEARo's build and credits (this menu, and the app menu while the
+    /// window is open — `MainWindowCommands`).
+    public static func showAbout() {
+        NSApp?.activate()
+        NSApp?.orderFrontStandardAboutPanel(options: [
+            .version: AboutInfo.version(info: Bundle.main.infoDictionary ?? [:]),
+            .credits: AboutInfo.credits(),
+        ])
     }
 
     private func exportPanel() {

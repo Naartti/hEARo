@@ -12,6 +12,9 @@ file records decisions and the current state.
 - **One window** (human request 2026-11-14): everything bigger than the popover lives in the
   single hEARo window as a toolbar tab, never in another window. Anything the popover shows can
   also be kept open there — the popover vanishes on any click, which is useless while testing.
+- **Present only while in use** (human request 2026-11-14): hEARo lives in the menu bar; it
+  takes a Dock icon, ⌘Tab slot and menu bar only while its window is open. Add chrome only when
+  it makes the experience better, and follow macOS convention when it does.
 
 ## Menu bar icon
 
@@ -43,8 +46,8 @@ validation and testing."
 - One `Window("hEARo", id: "main")` (`HearoKit/MainWindow.swift`) replaces the separate
   Review snapshots and Advanced Settings windows. Tabs **Controls · Review · Settings** as a
   segmented control in the toolbar (the Activity Monitor pattern; a sidebar would sit next to
-  Review's own clip list), **⌘1–⌘3** switch (hidden zero-opacity buttons — an LSUIElement app
-  has no visible menu bar to carry a View menu; the picker's tooltip lists them). The title
+  Review's own clip list), **⌘1–⌘3** switch (View menu, see *Dock icon while the window is
+  open*; the picker's tooltip lists them). The title
   text is removed from the toolbar so the tabs fit the narrow Controls window (it would push
   them into an overflow menu); the window is still called "hEARo" for Mission Control and
   VoiceOver.
@@ -68,6 +71,25 @@ validation and testing."
   trial settings stay. **Closing the window** drops the caches and temporary renders, as
   closing the old review window did (`ReviewModel.tabHidden` / `windowClosed`). Bare digits
   pick a region class; ⌘1–⌘3 never do.
+
+### Dock icon while the window is open (human request 2026-11-14)
+
+"Why isn't there an application icon in the Dock? If it's not needed and doesn't make the
+experience better then we shouldn't have it. But if it's best practice then we should."
+
+- **Decided: a Dock icon only while the hEARo window is open** (the Docker Desktop / Tailscale
+  / 1Password pattern). With no window, hEARo stays menu-bar-only (`LSUIElement`, no Dock icon,
+  not in ⌘Tab) — a background utility in the Dock is clutter. Opening the window switches to a
+  regular app (`setActivationPolicy(.regular)` before activating, or the menu bar doesn't
+  appear); closing it switches back to `.accessory`. Launch stays silent (no Dock flash).
+  Supersedes HANDOVER §13 "no Dock icon" for the window case.
+- Why: a window kept open for testing must be findable — ⌘Tab, the Dock, Mission Control —
+  and gets a real menu bar instead of workarounds.
+- **Menu bar while open** (`MainWindowCommands`): app menu "About hEARo" (same panel as the ⋯
+  menu) and **Settings… ⌘,** → Settings tab; **View → Controls ⌘1 · Review ⌘2 · Settings ⌘3**
+  (replaces the hidden zero-opacity shortcut buttons); standard Hide/Quit/Window menus. Each
+  item opens the window on its tab.
+- No "always show in Dock" setting; add one only if asked.
 
 ## Popover (360 pt wide) — current state
 

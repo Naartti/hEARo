@@ -223,12 +223,12 @@ struct AutoCaptureSection: View {
         Section {
             Toggle("Save a clip around every removed smack", isOn: binding(\.enabled))
             LabeledContent("Daily limit") {
-                number(binding(\.dailyCap), in: 1...limits.maxDailyCap, step: 50, unit: "clips", label: "Daily limit")
+                number(binding(\.dailyCap), in: 1...limits.maxDailyCap, step: 10, unit: "clips", label: "Daily limit")
             }
-            LabeledContent("Delete unreviewed clips after") {
+            LabeledContent("Delete unreviewed auto-saved clips after") {
                 number(
                     binding(\.retentionDays), in: 1...limits.maxRetentionDays, step: 1, unit: "days",
-                    label: "Delete unreviewed clips after")
+                    label: "Delete unreviewed auto-saved clips after")
             }
             LabeledContent("Saved in the last 24 hours") {
                 Text("\(model.snapshot.autoSavedLast24h) of \(model.autoCapture.dailyCap)").monospacedDigit()
@@ -254,10 +254,12 @@ struct AutoCaptureSection: View {
         HStack(spacing: 6) {
             TextField(label, value: value, format: .number)
                 .labelsHidden()
+                .accessibilityLabel("\(label), \(unit)")
+                .help("\(range.lowerBound)–\(range.upperBound) \(unit)")
                 .multilineTextAlignment(.trailing)
                 .frame(width: 64)
             Text(unit).foregroundStyle(.secondary).accessibilityHidden(true)
-            Stepper(label, value: value, in: range, step: step).labelsHidden()
+            Stepper("Change \(label.lowercased())", value: value, in: range, step: step).labelsHidden()
         }
         .accessibilityElement(children: .contain)
     }

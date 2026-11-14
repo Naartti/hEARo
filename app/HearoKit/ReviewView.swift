@@ -141,7 +141,7 @@ public struct ReviewView: View {
                 )
                 .frame(minHeight: showSpectrogram ? 260 : 200)
                 SelectionBar(model: model, annotation: annotation, showSpectrogram: showSpectrogram, resolution: $resolution)
-                ProposalList(model: model, annotation: annotation)
+                ProposalList(model: model, annotation: annotation, refocus: { focused = true })
             }
             .padding(14)
         } else if let error = model.errorMessage {
@@ -372,18 +372,23 @@ struct SelectionBar: View {
 struct ProposalList: View {
     @Bindable var model: ReviewModel
     let annotation: Annotation
+    /// Give keyboard focus back to the review view (a clicked button takes it, and A / X, Space
+    /// and Return only work while the view has it).
+    let refocus: () -> Void
 
     var body: some View {
         if !annotation.proposals.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Detector proposals").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                    Spacer()
-                    let open = annotation.proposals.filter { annotation.decision(for: $0) == .undecided }.count
-                    Text(open > 0 ? "\(open) to verify · A accept · X false positive · Return reviewed & next" : "All verified · Return reviewed & next")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Text("Detector proposals").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                let open = annotation.proposals.filter { annotation.decision(for: $0) == .undecided }.count
+                Text(
+                    open > 0
+                        ? "\(open) to verify — A: accept · X: false positive · Return: reviewed & next"
+                        : "All verified — Return: reviewed & next"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach(annotation.proposals) { p in
@@ -411,25 +416,36 @@ struct ProposalList: View {
             if let db = p.dbRemoved { Text(String(format: "%.1f dB", db)).foregroundStyle(.secondary) }
             if p.inPressWindow { Image(systemName: "scope").foregroundStyle(.secondary).help("In the press window") }
             Spacer()
-            Button("Show") { model.showProposal(p.id) }
-                .help("Zoom to it; A / X then act on this one")
+            let at = String(format: "%.0f ms", p.start * 1000)
+            Button("Show") {
+                model.showProposal(p.id)
+                refocus()
+            }
+            .help("Zoom to it; A / X then act on this one")
+            .accessibilityLabel("Show proposal at \(at)")
             Button(decision == .accepted ? "Accepted" : "Accept (A)", systemImage: "checkmark") {
                 model.accept(proposal: p.id)
+                refocus()
             }
             .disabled(decision == .accepted)
             .help("It is what the detector says: keep it as a marked region (A)")
+            .accessibilityLabel("Accept proposal at \(at)")
             Button(decision == .rejected ? "False positive" : "False positive (X)", systemImage: "xmark") {
                 model.reject(proposal: p.id)
+                refocus()
             }
             .disabled(decision == .rejected)
             .help("The detector was wrong: keep it as a hard negative for training (X)")
+            .accessibilityLabel("Mark proposal at \(at) as a false positive")
         }
         .labelStyle(.titleAndIcon)
         .font(.caption)
         .controlSize(.small)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(
-            "Proposal \(String(format: "%.0f", p.start * 1000)) milliseconds, \(decision == .accepted ? "accepted" : decision == .rejected ? "false positive" : "not verified")")
+            "Proposal \(String(format: "%.0f", p.start * 1000)) milliseconds, \(decision == .accepted ? "accepted" : decision == .rejected ? "false positive" : "not verified")"
+        )
+        .accessibilityValue(target == p.id ? "Next to verify: A accepts, X marks a false positive" : "")
     }
 }
 

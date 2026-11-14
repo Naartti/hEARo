@@ -30,7 +30,7 @@ file records decisions and the current state.
   | On, processing audio | `ear.fill` | template, subtle steady state |
   | **Just removed something** (smack, click, ...) | `ear.fill` | **accent colour glow for ~0.5 s**, then back; bursts coalesce |
   | Snapshot saved (`§`) | `ear.badge.checkmark` | accent, ~1.2 s |
-  | Auto-saved a de-smack catch | `ear.badge.checkmark` | **de-smack colour** (orange-red), ~1.2 s |
+  | Auto-saved a de-smack catch | `ear.badge.checkmark` | **de-smack orange** `#F2662A` in both appearances (the menu bar follows the wallpaper, not the app), ~1.2 s |
   | Problem (permission denied, fallback) | `ear.trianglebadge.exclamationmark` | template |
 
   Colour is only used for *momentary* events, so the icon stays a calm template image the rest
@@ -221,8 +221,8 @@ positive — "which is an important dataset also". Privacy is fine for them (loc
 
 - **Settings tab**, section *Auto-save de-smack catches*: a toggle (off by default), *Daily
   limit* (1–2000, default 250; a rolling 24 h window, so it behaves the same across restarts and
-  time zones), *Delete unreviewed auto-saved clips after* (1–365 days, default 31), and a line
-  "N saved in the last 24 hours". Clips you reviewed are never auto-deleted; neither are `§`
+  time zones; steps of 10), *Delete unreviewed auto-saved clips after* (1–365 days, default
+  31), and *Saved in the last 24 hours: N of <limit>*. Clips you reviewed are never auto-deleted; neither are `§`
   snapshots. A changed retention deletes nothing for an hour (time to fix a typo). Stored with the app's other preferences (UserDefaults); Rust clamps the values.
 - **Capture:** an 8 s clip ending 3 s after the last catch in a burst; catches within ~4.5 s of
   the first share one clip. Saved as label `auto` with the catches as `proposals` (same format

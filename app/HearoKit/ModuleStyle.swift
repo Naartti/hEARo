@@ -43,6 +43,12 @@ public struct ModuleStyle: Sendable, Equatable {
             blue: Double(hex & 0xFF) / 255)
     }
 
+    /// For the menu bar icon: the menu bar's own appearance follows the wallpaper, not the app,
+    /// so one mid-luminance variant (the dark-appearance one) that reads on light and dark bars.
+    public var menuBarHex: UInt32 { dark }
+
+    public var menuBarColor: Color { color(.dark) }
+
     /// Whether the module is drawn as a band (has a gain-reduction row).
     public var isCleanup: Bool { cleanupModuleKeys.contains(key) }
 }

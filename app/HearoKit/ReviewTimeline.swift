@@ -315,7 +315,7 @@ struct TimelineMarks {
         cross.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
         cross.move(to: CGPoint(x: rect.minX, y: rect.maxY))
         cross.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-        let grey = GraphicsContext.Shading.color(.gray.opacity(0.8))
+        let grey = GraphicsContext.Shading.color(.secondary)
         ctx.stroke(Path(rect), with: grey, style: StrokeStyle(lineWidth: 1.2, dash: [4, 3]))
         ctx.stroke(cross, with: grey, lineWidth: 1)
     }

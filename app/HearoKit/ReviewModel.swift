@@ -108,6 +108,11 @@ public final class ReviewModel {
     /// Persist the current annotation to the sidecar.
     public func commit() {
         guard let a = annotation, let i = selectedIndex else { return }
+        // Deleted underneath us (auto-delete, Finder): don't leave a sidecar without audio.
+        guard FileManager.default.fileExists(atPath: clips[i].wavURL.path) else {
+            errorMessage = "\(clips[i].stem) no longer exists (deleted outside the window)."
+            return
+        }
         do {
             try SnapshotLibrary.save(a, to: clips[i].jsonURL)
             clips[i].reviewed = a.reviewed
@@ -150,7 +155,9 @@ public final class ReviewModel {
 
     /// Mark a proposal as a false positive (saved in the sidecar's `rejected`).
     public func reject(proposal index: Int) {
-        if let p = annotation?.proposals.first(where: { $0.id == index }), annotation?.acceptedRegion(for: p) != nil {
+        if let p = annotation?.proposals.first(where: { $0.id == index }),
+            let r = annotation?.acceptedRegion(for: p), r.id == selectedRegion
+        {
             selectedRegion = nil
         }
         edit { $0.reject(proposal: index) }

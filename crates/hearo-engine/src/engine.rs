@@ -94,6 +94,7 @@ pub struct LiveEngine {
     module_count: usize,
     capture: Option<Arc<CaptureRing>>,
     waveform: Arc<crate::waveform::WaveformRing>,
+    events: Arc<crate::EventRing>,
     /// Process objects the tap excludes (for the watchdog's "is a tapped app playing?").
     tap_excluded: Vec<ObjectId>,
 }
@@ -190,6 +191,7 @@ impl LiveEngine {
         let capture =
             (capture_secs > 0.0).then(|| Arc::new(CaptureRing::new((capture_secs * agg_info.sample_rate) as usize)));
         let waveform = Arc::new(crate::waveform::WaveformRing::default());
+        let events = Arc::new(crate::EventRing::default());
         let state = Box::into_raw(Box::new(
             RtState::with_capture(
                 chain,
@@ -199,7 +201,8 @@ impl LiveEngine {
                 stats.clone(),
                 capture.clone(),
             )
-            .with_waveform(waveform.clone()),
+            .with_waveform(waveform.clone())
+            .with_events(events.clone()),
         ));
 
         let mut proc_id: AudioDeviceIOProcID = None;
@@ -224,6 +227,7 @@ impl LiveEngine {
             module_count,
             capture,
             waveform,
+            events,
             tap_excluded,
         };
         engine.use_only_tap_input()?;
@@ -296,6 +300,23 @@ impl LiveEngine {
         let ring = self.capture.as_ref()?;
         let frames = (seconds * self.info.aggregate.sample_rate) as usize;
         (0..3).find_map(|_| ring.snapshot(frames))
+    }
+
+    /// Unprocessed input frames `start..start + frames` by absolute frame number (the clock of
+    /// [`hearo_dsp::Event::start_sample`]), if capture is on and the range is still held.
+    pub fn capture_window(&self, start: u64, frames: usize) -> Option<(Vec<f32>, Vec<f32>)> {
+        let ring = self.capture.as_ref()?;
+        (0..3).find_map(|_| ring.window(start, frames))
+    }
+
+    /// Frames captured so far (the capture ring's clock; 0 when capture is off).
+    pub fn captured_frames(&self) -> u64 {
+        self.capture.as_ref().map_or(0, |r| r.written())
+    }
+
+    /// The chain's detection events since the last call (one consumer only).
+    pub fn drain_events(&self, out: &mut Vec<hearo_dsp::Event>) {
+        self.events.drain(out);
     }
 
     /// Live waveform columns (see [`crate::waveform`]).

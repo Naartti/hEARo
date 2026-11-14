@@ -5,10 +5,12 @@
 //! (see `docs/deep-dives/01-core-audio-taps.md`, ADR 0003, ADR 0010).
 //!
 //! Threads: the IOProc (real time) only touches pre-allocated state, atomics in
-//! [`Controls`] and [`Stats`]. Everything else (setup, teardown, polling) is control-thread work.
+//! [`Controls`] and [`Stats`], and lock-free rings ([`CaptureRing`], [`EventRing`], the waveform).
+//! Everything else (setup, teardown, polling) is control-thread work.
 
 pub mod capture;
 pub mod controls;
+pub mod events;
 pub mod snapshots;
 pub mod stats;
 pub mod supervisor;
@@ -29,6 +31,7 @@ pub use capture::CaptureRing;
 pub use controls::{Controls, MAX_PARAMS, MAX_SLOTS};
 #[cfg(target_os = "macos")]
 pub use engine::{EngineConfig, EngineError, LiveEngine, RunInfo, scaled_buffer_frames};
+pub use events::EventRing;
 pub use stats::{Stats, StatsSnapshot};
 
 /// Bundle-ID prefixes excluded from processing by default: music players and DAWs (§13.3).

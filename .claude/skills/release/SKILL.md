@@ -13,8 +13,10 @@ Public releases are built by GitHub Actions (`.github/workflows/release.yml`, AD
    `chore(release): v<version>`, open a PR, wait for green checks; the human merges.
 2. Optional dry run: `gh workflow run release.yml --ref main`, then download the artifact and
    check it (step 4).
-3. **Ask the human before tagging** — a pushed tag publishes a release. Then on the merged
-   `main`: `git tag v<version> && git push origin v<version>`; watch with `gh run watch`.
+3. **Ask the human before tagging** — a pushed tag publishes a release. Wait until CI on the
+   merged `main` commit is green (the workflow refuses tags without a green CI run or off
+   `main`), then `git tag v<version> && git push origin v<version>`; watch with `gh run watch`.
+   A `-rc.N` suffix publishes a pre-release that never becomes "latest".
 4. Verify the published DMG on this Mac: `shasum -a 256 -c`, `gh attestation verify <dmg> --repo
    Naartti/hEARo`, `codesign -dv` shows `Signature=adhoc` and no Authority line (no personal
    certificate), mount it (volume "hEARo" with the icon, app + Applications link + read-me),

@@ -30,8 +30,8 @@ hdiutil detach -quiet "$mnt"
 hdiutil convert -quiet "$rw" -format UDZO -o "$dmg"
 rm -f "$rw"
 # Sign the disk image too, so its origin is verifiable.
-# (Same precedence as sign.sh; an ad-hoc "-" identity adds nothing to a disk image, so skip it.)
-if [[ -z "${SIGN_IDENTITY:-}" && -f .env.local ]]; then set -a && . ./.env.local && set +a; fi
+# (An ad-hoc "-" identity adds nothing to a disk image, so skip it.)
+load_sign_identity
 if [[ -n "${SIGN_IDENTITY:-}" && "$SIGN_IDENTITY" != - ]]; then codesign --force --sign "$SIGN_IDENTITY" "$dmg"; fi
 hdiutil verify "$dmg" >/dev/null
 echo "✔ $dmg ($(du -h "$dmg" | cut -f1))"

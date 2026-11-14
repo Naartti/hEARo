@@ -58,6 +58,17 @@ xcode_dev_dir() {
   return 1
 }
 
+# load_sign_identity — set SIGN_IDENTITY for sign.sh / package-dmg.sh. A value already in the
+# environment wins over .env.local: public releases in GitHub Actions pass
+# `ALLOW_ADHOC=1 SIGN_IDENTITY=-` so no personal certificate ends up in them (ADR 0016).
+load_sign_identity() {
+  if [[ -n "${SIGN_IDENTITY:-}" ]]; then
+    echo "${DIM}signing identity from the environment (not .env.local)${RESET}"
+  elif [[ -f .env.local ]]; then
+    set -a && . ./.env.local && set +a
+  fi
+}
+
 # Fingerprint of the tree being gated, taken when the gate starts (see tree-fingerprint.sh).
 GATE_TREE="$("$ROOT/scripts/tree-fingerprint.sh")"
 

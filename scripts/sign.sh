@@ -2,12 +2,11 @@
 # Sign an .app with the stable identity from .env.local (SIGN_IDENTITY).
 # Ad-hoc signing loses the System Audio Recording permission on every rebuild (§3.5), so it is
 # refused unless ALLOW_ADHOC=1. Usage: scripts/sign.sh path/to/App.app [--release]
-# SIGN_IDENTITY already in the environment wins over .env.local: public release builds in GitHub
-# Actions use `ALLOW_ADHOC=1 SIGN_IDENTITY=-` so no personal certificate ends up in them (ADR 0016).
+# SIGN_IDENTITY in the environment wins over .env.local (load_sign_identity in lib.sh).
 . "$(dirname "$0")/lib.sh"
 app="${1:?usage: sign.sh App.app [--release]}"
 release="${2:-}"
-if [[ -z "${SIGN_IDENTITY:-}" && -f .env.local ]]; then set -a && . ./.env.local && set +a; fi
+load_sign_identity
 identity="${SIGN_IDENTITY:-}"
 if [[ -z "$identity" || "$identity" == "-" ]]; then
   if [[ "${ALLOW_ADHOC:-0}" != 1 ]]; then

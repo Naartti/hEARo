@@ -8,6 +8,8 @@ public struct ControlsView: View {
     let viewer: LiveViewer
     @Environment(\.openWindow) private var openWindow
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// False while the hEARo window is minimised, hidden or covered (no polling then).
+    @Environment(\.liveViewOnScreen) private var onScreen
 
     public init(model: AppModel, viewer: LiveViewer = .popover) {
         self.model = model
@@ -44,8 +46,9 @@ public struct ControlsView: View {
         }
         .padding(14)
         .frame(width: 360)
-        .onAppear { model.setLiveViewVisible(true, viewer: viewer, reduceMotion: reduceMotion) }
-        .onChange(of: reduceMotion) { _, on in model.setLiveViewVisible(true, viewer: viewer, reduceMotion: on) }
+        .onAppear { model.setLiveViewVisible(onScreen, viewer: viewer, reduceMotion: reduceMotion) }
+        .onChange(of: reduceMotion) { _, on in model.setLiveViewVisible(onScreen, viewer: viewer, reduceMotion: on) }
+        .onChange(of: onScreen) { _, on in model.setLiveViewVisible(on, viewer: viewer, reduceMotion: reduceMotion) }
         .onDisappear { model.setLiveViewVisible(false, viewer: viewer) }
     }
 
@@ -169,7 +172,7 @@ extension ControlsView {
     /// ⋯ menu: the same entries as the right-click menu on the menu bar icon (incl. Quit, ⌘Q).
     var moreMenu: some View {
         Menu {
-            AppMenu(model: model, show: show).swiftUIContent
+            AppMenu(model: model, inWindow: viewer == .window, show: show).swiftUIContent
         } label: {
             Image(systemName: "ellipsis.circle")
         }

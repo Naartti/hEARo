@@ -70,8 +70,8 @@ public final class AppModel {
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var waveTimer: Timer?
     @ObservationIgnored private var waveCursor: UInt64 = 0
-    /// Live views currently on screen (the popover, the window's Controls tab).
-    @ObservationIgnored private var liveViewers: Set<LiveViewer> = []
+    /// Live views currently on screen (the popover, the window's Controls tab) → Reduce Motion.
+    @ObservationIgnored private var liveViewers: [LiveViewer: Bool] = [:]
     /// The hEARo window's selected tab (`MainWindowView`).
     public var mainTab: MainTab = .controls
     /// The popover's live waveform (≈ 3 s at 60 columns/s).
@@ -137,22 +137,24 @@ public final class AppModel {
 
     /// Start/stop the waveform poll with the live views (no UI work while none is on screen):
     /// it runs while the popover *or* the window's Controls tab is visible. Under Reduce Motion
-    /// the waveform updates 10×/s in chunks instead of scrolling smoothly.
+    /// (in any visible view) the waveform updates 10×/s in chunks instead of scrolling smoothly.
     public func setLiveViewVisible(_ visible: Bool, viewer: LiveViewer, reduceMotion: Bool = false) {
-        if visible { liveViewers.insert(viewer) } else { liveViewers.remove(viewer) }
-        guard !liveViewers.isEmpty else {
-            waveTimer?.invalidate()
-            waveTimer = nil
-            return
-        }
-        guard visible else { return }  // another view is still showing; keep its timer
+        liveViewers[viewer] = visible ? reduceMotion : nil
+        let interval: TimeInterval? =
+            liveViewers.isEmpty ? nil : (liveViewers.values.contains(true) ? 0.1 : 1.0 / 30)
+        guard interval != waveformPollInterval else { return }  // keep the running timer
         waveTimer?.invalidate()
+        waveTimer = nil
+        waveformPollInterval = interval
+        guard let interval else { return }
         pollWaveform()
-        waveTimer = Timer.scheduledTimer(withTimeInterval: reduceMotion ? 0.1 : 1.0 / 30, repeats: true) { [weak self] _ in
+        waveTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.pollWaveform() }
         }
     }
 
+    /// Seconds between waveform polls, `nil` while no live view is visible.
+    @ObservationIgnored private(set) var waveformPollInterval: TimeInterval?
     var isPollingWaveform: Bool { waveTimer != nil }
 
     /// Select a tab of the hEARo window (the caller opens the window).

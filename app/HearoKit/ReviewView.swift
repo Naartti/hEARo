@@ -94,7 +94,10 @@ public struct ReviewView: View {
             return .handled
         }
         .onKeyPress(characters: .decimalDigits, phases: .down) { press in
-            guard let d = Int(press.characters), let cls = RegionClass(key: d) else { return .ignored }
+            // ⌘1–⌘3 switch the window's tabs; only bare digits pick a class.
+            guard press.modifiers.isDisjoint(with: [.command, .option, .control]), let d = Int(press.characters),
+                let cls = RegionClass(key: d)
+            else { return .ignored }
             model.setClass(cls)
             return .handled
         }
@@ -111,9 +114,8 @@ public struct ReviewView: View {
             focused = true
         }
         .onDisappear {
-            model.player?.stop()
-            model.spectrograms.removeAll()  // the app lives on in the menu bar
-            model.inspector?.windowClosed()
+            // Another tab (or the window closed): stop playback; the window drops the caches.
+            model.tabHidden()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             model.reload()

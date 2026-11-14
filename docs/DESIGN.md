@@ -43,24 +43,31 @@ validation and testing."
 - One `Window("hEARo", id: "main")` (`HearoKit/MainWindow.swift`) replaces the separate
   Review snapshots and Advanced Settings windows. Tabs **Controls · Review · Settings** as a
   segmented control in the toolbar (the Activity Monitor pattern; a sidebar would sit next to
-  Review's own clip list), **⌘1–⌘3** switch (hidden buttons — an LSUIElement app has no View
-  menu). The window title is "hEARo".
+  Review's own clip list), **⌘1–⌘3** switch (hidden zero-opacity buttons — an LSUIElement app
+  has no visible menu bar to carry a View menu; the picker's tooltip lists them). The title
+  text is removed from the toolbar so the tabs fit the narrow Controls window (it would push
+  them into an overflow menu); the window is still called "hEARo" for Mission Control and
+  VoiceOver.
 - **Controls** is the popover's content (`ControlsView`, same 360 pt column) — it stays open
   until the window is closed. The popover header has a window button (`macwindow`, "Open in a
   window") that opens it on this tab. The live waveform polls while the popover *or* this tab
-  is on screen (`AppModel.setLiveViewVisible`, reference-counted per view).
+  is on screen (`AppModel.setLiveViewVisible`, tracked per view; a view joining doesn't restart
+  the timer; Reduce Motion in either view slows it to 10×/s). "On screen" uses AppKit's
+  occlusion state, so a minimised, hidden (⌘H) or fully covered window stops polling too.
 - Opening: popover window button → Controls; "Advanced…" link and ⋯ / right-click
   "Advanced settings…" → Settings; "Review snapshots…" → Review; new menu entry **Open hEARo
   Window** → Controls. Every route activates the app (menu-bar-only apps otherwise open
   windows behind the frontmost app). In the window, "Advanced…" just switches tabs.
-- **Sizing:** opens at 1300 × 680 (Review's size); the window grows to each tab's minimum
-  (Review 820/1100 pt with the inspector) and doesn't shrink back. Settings keeps a 680 pt
-  column centred so sliders don't stretch across a wide window.
-- **Switching away from Review** is like closing its window used to be: playback stops and
-  renders/spectrograms are dropped (re-rendered in ≈ 80 ms on return); the open clip, viewport
-  and trial settings stay.
-- Follow-up: the Controls tab keeps polling the waveform while the window is minimised or
-  hidden behind other windows (only closing it or switching tabs stops it).
+- **Sizing:** each tab has its own window size, like Xcode's settings tabs — Controls ≈ 460 ×
+  640 (so it sits beside the app under test), Review 1300 × 680, Settings 600 × 720. The window
+  opens at the size of the tab it opens on; switching tabs resizes it (top-left corner fixed,
+  animated unless Reduce Motion) and each tab remembers the size you gave it while the app
+  runs. Never below the tab's minimum (Review 820/1100 pt with the inspector). Settings keeps a
+  680 pt column centred if the window is made wider.
+- **Switching away from Review** only stops playback; the open clip, render, spectrograms and
+  trial settings stay. **Closing the window** drops the caches and temporary renders, as
+  closing the old review window did (`ReviewModel.tabHidden` / `windowClosed`). Bare digits
+  pick a region class; ⌘1–⌘3 never do.
 
 ## Popover (360 pt wide) — current state
 
@@ -72,7 +79,7 @@ validation and testing."
 | Modules: colour swatch (the legend), toggle, name, trigger count; under each name an **amount slider** for the module's primary parameter; "Advanced…" link | done (human request 2026-11-14), see *Module settings* |
 | Sources: apps producing audio with include/exclude | M3 |
 | Labeling hints + Review… | Review tab of the hEARo window (⋯ → "Review snapshots…"); hints M6 |
-| Footer: Settings…, Visualizer…, Quit | ⋯ menu: About hEARo / Review / Advanced settings / Export / Import / Show in Finder / Launch at login / **Quit (⌘Q)**; the **same menu on right-click** of the menu bar icon (`HearoKit/AppMenu.swift`, human request 2026-11-14) |
+| Footer: Settings…, Visualizer…, Quit | ⋯ menu: About hEARo / Open hEARo Window (not shown inside the window) / Review / Advanced settings / Export / Import / Show in Finder / Launch at login / **Quit (⌘Q)**; the **same menu on right-click** of the menu bar icon (`HearoKit/AppMenu.swift`, human request 2026-11-14) |
 | Special states: onboarding, permission denied, engine fallback | denied state done |
 
 ## Module colours (human request 2026-11-14)

@@ -226,6 +226,22 @@ public final class ReviewModel {
 }
 
 extension ReviewModel {
+    /// The Review tab went away (another tab, or the window closed): stop playback but keep the
+    /// open clip, render and spectrograms, so flipping tabs costs nothing.
+    public func tabHidden() {
+        player?.stop()
+    }
+
+    /// The hEARo window closed: drop caches and temporary renders (the app lives on in the
+    /// menu bar).
+    public func windowClosed() {
+        player?.stop()
+        spectrograms.removeAll()
+        inspector?.windowClosed()
+    }
+}
+
+extension ReviewModel {
     /// Populated with a synthetic clip for SwiftUI previews (no files). `live`: also show the
     /// processing inspector with a synthetic render.
     public static func preview(live: (any LiveSettings)? = nil) -> ReviewModel {

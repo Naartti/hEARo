@@ -23,11 +23,13 @@ public enum MainTab: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    public var systemImage: String {
+    /// The window size this tab opens at (each tab remembers its own size while the app runs,
+    /// like Xcode's settings tabs: a narrow Controls window can sit beside the app under test).
+    public var defaultSize: CGSize {
         switch self {
-        case .controls: "slider.horizontal.3"
-        case .review: "waveform.badge.magnifyingglass"
-        case .settings: "gearshape"
+        case .controls: CGSize(width: 460, height: 640)
+        case .review: CGSize(width: 1300, height: 680)
+        case .settings: CGSize(width: 600, height: 720)
         }
     }
 
@@ -50,9 +52,27 @@ extension AppModel {
     /// Open (or bring forward) the hEARo window on `tab`. hEARo is menu-bar-only (LSUIElement),
     /// so the app is activated too, or the window would open behind the frontmost app.
     public func openMainWindow(_ tab: MainTab, using openWindow: OpenWindowAction) {
+        openMainWindow(tab, open: { openWindow(id: $0) })
+    }
+
+    /// Testable core of `openMainWindow(_:using:)`: select, open, activate — in that order.
+    func openMainWindow(_ tab: MainTab, open: (String) -> Void, activate: () -> Void = { NSApp?.activate() }) {
         show(tab)
-        openWindow(id: mainWindowID)
-        NSApp?.activate()
+        open(mainWindowID)
+        activate()
+    }
+}
+
+private struct LiveViewOnScreenKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    /// False while the window holding a live view is minimised, hidden or fully covered, so the
+    /// view stops polling (`ControlsView`).
+    public var liveViewOnScreen: Bool {
+        get { self[LiveViewOnScreenKey.self] }
+        set { self[LiveViewOnScreenKey.self] = newValue }
     }
 }
 
@@ -61,6 +81,11 @@ extension AppModel {
 public struct MainWindowView: View {
     @Bindable var model: AppModel
     let review: ReviewModel
+    @State private var window: NSWindow?
+    @State private var onScreen = true
+    /// Each tab's window size, remembered while the app runs.
+    @State private var sizes: [MainTab: CGSize] = [:]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(model: AppModel, review: ReviewModel) {
         self.model = model
@@ -69,7 +94,16 @@ public struct MainWindowView: View {
 
     public var body: some View {
         content
+            .environment(\.liveViewOnScreen, onScreen)
+            .background(
+                WindowObserver(
+                    attached: { window = $0 }, onScreen: { onScreen = $0 },
+                    willClose: { review.windowClosed() }))
+            .onChange(of: model.mainTab) { old, new in resize(from: old, to: new) }
             .navigationTitle("hEARo")
+            // The tabs are the toolbar; the title text would crowd them into an overflow menu
+            // in the narrow Controls window (the window keeps "hEARo" for Mission Control/VoiceOver).
+            .toolbar(removing: .title)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Picker("View", selection: $model.mainTab) {
@@ -80,6 +114,7 @@ public struct MainWindowView: View {
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .fixedSize()
+                    .accessibilityLabel("hEARo section")
                     .help("Controls ⌘1 · Review ⌘2 · Settings ⌘3")
                 }
             }
@@ -111,5 +146,87 @@ public struct MainWindowView: View {
                 .frame(maxWidth: 680)
                 .frame(maxWidth: .infinity)
         }
+    }
+
+    /// Give each tab its own window size, keeping the top-left corner where it is. Deferred a
+    /// run-loop turn so SwiftUI has applied the new tab's minimum size first.
+    private func resize(from old: MainTab, to new: MainTab) {
+        guard let window else { return }
+        sizes[old] = window.frame.size
+        let target = sizes[new] ?? new.defaultSize
+        let animate = !reduceMotion
+        DispatchQueue.main.async {
+            let min = window.minSize
+            let size = CGSize(width: max(target.width, min.width), height: max(target.height, min.height))
+            var frame = window.frame
+            frame.origin.y += frame.height - size.height
+            frame.size = size
+            window.setFrame(frame, display: true, animate: animate)
+        }
+    }
+}
+
+/// Reports the hosting `NSWindow`, whether it is on screen (not minimised, hidden or fully
+/// covered — AppKit's occlusion state) and when it closes.
+struct WindowObserver: NSViewRepresentable {
+    let attached: (NSWindow) -> Void
+    let onScreen: (Bool) -> Void
+    let willClose: () -> Void
+
+    func makeNSView(context: Context) -> ObserverView {
+        ObserverView(attached: attached, onScreen: onScreen, willClose: willClose)
+    }
+
+    func updateNSView(_ view: ObserverView, context: Context) {}
+
+    final class ObserverView: NSView {
+        let attached: (NSWindow) -> Void
+        let onScreen: (Bool) -> Void
+        let willClose: () -> Void
+        private var tokens: [NSObjectProtocol] = []
+
+        init(attached: @escaping (NSWindow) -> Void, onScreen: @escaping (Bool) -> Void, willClose: @escaping () -> Void) {
+            self.attached = attached
+            self.onScreen = onScreen
+            self.willClose = willClose
+            super.init(frame: .zero)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError("not used") }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            tokens.forEach(NotificationCenter.default.removeObserver)
+            tokens = []
+            guard let window else { return }
+            attached(window)
+            let center = NotificationCenter.default
+            tokens.append(
+                center.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main) {
+                    [weak self] _ in
+                    MainActor.assumeIsolated {
+                        guard let self, let window = self.window else { return }
+                        self.onScreen(window.occlusionState.contains(.visible))
+                    }
+                })
+            tokens.append(
+                center.addObserver(forName: NSWindow.willCloseNotification, object: window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.willClose() }
+                })
+        }
+
+        isolated deinit {
+            tokens.forEach(NotificationCenter.default.removeObserver)
+        }
+    }
+}
+
+// PreviewProvider rather than #Preview (no macro plugin with Command Line Tools).
+struct MainWindowView_Previews: PreviewProvider {
+    static var previews: some View {
+        let model = AppModel(engine: FakeEngine(.previewRunning))
+        MainWindowView(model: model, review: .preview(live: model))
+            .frame(width: 1100, height: 640)
     }
 }

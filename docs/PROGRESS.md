@@ -240,7 +240,8 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
       popover can open it (window button) and every existing entry (Advanced…, ⋯ / right-click
       Review / Advanced) lands on the right tab; (d) no other separate windows remain.
       `MainWindow.swift`, `ControlsView` (was `PopoverView`), menu entry "Open hEARo Window".
-  - [ ] Follow-up: stop the Controls tab's waveform poll while the window is minimised/occluded.
+  - [ ] Found while verifying (on `main` too): the open popover / Controls tab costs ≈ 40 %
+        of a core (app 18 % → 58 % in `top`, processing on) — profile the 30 Hz waveform redraw.
 - [x] **Spectrogram in the review window (2026-11-14):** log-frequency (30 Hz–20 kHz) magma
       lane under the waveform, sharing viewport/playhead/axis; marking, zoom and regions work on
       both lanes. ⇧⌘S / header toggle (remembered); resolution menu time 512 / balanced 1024 /

@@ -26,17 +26,20 @@ public struct AppMenu {
     }
 
     let model: AppModel
+    /// Shown inside the hEARo window, where "Open hEARo Window" would do nothing.
+    let inWindow: Bool
     /// Opens the hEARo window on a tab (`MainWindowView`).
     let show: (MainTab) -> Void
 
-    public init(model: AppModel, show: @escaping (MainTab) -> Void) {
+    public init(model: AppModel, inWindow: Bool = false, show: @escaping (MainTab) -> Void) {
         self.model = model
+        self.inWindow = inWindow
         self.show = show
     }
 
     public var items: [Item] {
         // A menu bar app has no standard app menu, so "About" lives here, first.
-        var out: [Item] = [.about, .divider, .window, .review, .advanced, .divider, .export, .import, .showInFinder]
+        var out: [Item] = [.about, .divider] + (inWindow ? [] : [.window]) + [.review, .advanced, .divider, .export, .import, .showInFinder]
         if model.canLaunchAtLogin { out += [.divider, .launchAtLogin(on: model.launchAtLogin)] }
         return out + [.divider, .quit]
     }

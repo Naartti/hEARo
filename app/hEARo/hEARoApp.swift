@@ -46,7 +46,8 @@ struct HearoApp: App {
         Window("hEARo", id: mainWindowID) {
             MainWindowView(model: model, review: review)
         }
-        .defaultSize(width: 1300, height: 680)
+        // Opens at the size of the tab it opens on (Controls is narrow, Review wide).
+        .defaultWindowPlacement { _, _ in WindowPlacement(size: model.mainTab.defaultSize) }
         .windowResizability(.contentMinSize)
         .defaultLaunchBehavior(.suppressed)
     }

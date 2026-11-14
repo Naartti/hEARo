@@ -25,7 +25,12 @@ while IFS= read -r f; do
   case "$f" in
     .github/workflows/*.yml|.github/workflows/*.yaml)
       # Supply chain (ADR 0016): third-party actions only by full commit SHA, tag as a comment.
-      if unpinned="$(grep -nE '^[[:space:]-]*uses:[[:space:]]*[^.[:space:]]' "$f" | grep -vE '@[0-9a-f]{40}([[:space:]]|$)')"; then
+      # Strip the trailing comment and quotes first, so `@main # @<sha>` can't pass and
+      # `'owner/repo@<sha>'` isn't rejected; local `./` actions need no pin, Docker needs a digest.
+      unpinned="$(grep -nE '^[[:space:]-]*uses:' "$f" \
+        | sed -E 's/[[:space:]]+#.*$//; s/uses:[[:space:]]*["'\'']?([^"'\'']*)["'\'']?[[:space:]]*$/uses: \1/' \
+        | grep -vE 'uses: (\./|[^@[:space:]]+@[0-9a-f]{40}$|docker://[^@[:space:]]+@sha256:[0-9a-f]{64}$)' || true)"
+      if [[ -n "$unpinned" ]]; then
         echo "✘ $f: pin actions to a commit SHA (uses: owner/repo@<sha> # vX.Y.Z):"; echo "$unpinned"; bad=1
       fi ;;
   esac

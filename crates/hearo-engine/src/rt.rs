@@ -163,7 +163,10 @@ impl RtState {
             offset += n;
         }
         // Events (with chain-input sample positions = capture-ring frames) to the control thread.
-        if let Some(ring) = &self.events {
+        // Under global bypass nothing was removed from what plays, so there is nothing to report.
+        if let Some(ring) = &self.events
+            && !self.chain.is_bypassed()
+        {
             ring.push_all(self.chain.telemetry().events());
         }
         self.chain.telemetry_mut().clear_events();
@@ -463,6 +466,39 @@ mod tests {
         let (next, cols) = ring.read_since(0, 1000);
         assert!((58..=61).contains(&next), "{next} columns for 1 s");
         assert!(cols.iter().skip(2).all(|c| (c.peak - 0.25).abs() < 1e-3 && !c.removed()));
+    }
+
+    /// Under global bypass (A/B) de-smack still detects, but nothing was removed from what plays:
+    /// no events reach the ring (no auto-saved "catches", no orange flash; review finding).
+    #[test]
+    fn bypassed_chain_reports_no_events() {
+        let sr = 48_000.0;
+        let (sig, _) = hearo_testkit::signals::speech_with_pause_smacks(sr, 8.0, 41, 5, (-18.0, -12.0), -55.0);
+        let events = Arc::new(EventRing::new(64));
+        let mut st =
+            state(vec![Box::new(hearo_dsp::modules::desmack::DeSmack::new())], 512).with_events(events.clone());
+        st.controls.set_bypass(true);
+        let mut tap = vec![0.0f32; 2 * 512];
+        let mut out = vec![0.0f32; 2 * 512];
+        let tap_ptr = tap.as_mut_ptr();
+        let mut inp = FakeList::new(&mut [(2, Some(&mut tap))]);
+        let mut outp = FakeList::new(&mut [(2, Some(&mut out))]);
+        let (_, allocs) = count_allocs(|| {
+            for chunk in sig.as_chunks::<512>().0 {
+                for (i, x) in chunk.iter().enumerate() {
+                    // SAFETY: the fake list points at `tap`, which outlives the loop.
+                    unsafe {
+                        *tap_ptr.add(2 * i) = *x;
+                        *tap_ptr.add(2 * i + 1) = *x;
+                    }
+                }
+                st.process(Some(inp.list()), outp.list());
+            }
+        });
+        assert_eq!(allocs, 0);
+        let mut got = Vec::new();
+        events.drain(&mut got);
+        assert!(got.is_empty(), "{} events while bypassed", got.len());
     }
 
     /// De-smack in the live path: its gain reduction lands in the waveform columns (with the

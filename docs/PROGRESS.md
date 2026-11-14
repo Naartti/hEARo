@@ -165,6 +165,13 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
   - [ ] Stop-consonant test blind spot: measure per stop over burst + aspiration (released
         provisional ducks report no event); add weak-, decaying-aspiration and utterance-final
         stop variants (DSP review 2026-11-14; HEAD already ducks some weak-aspiration stops).
+  - [ ] Telemetry under bypass/warm-up (RT review 2026-11-14): trigger counters (popover count,
+        `.removing` glow) still count while globally bypassed; a slot warming up reports events
+        for audio it didn't remove (could auto-save a spurious clip). Count published events in
+        `RtState`; truncate events pushed by a `WarmingUp` slot.
+  - [ ] Auto-save follow-ups (reviews 2026-11-14): surface `skipped_by_cap` and dropped events in
+        status; snapshot/preview tests for the new visual states; clip cutting assumes the
+        chain's clock never stalls (it doesn't advance on its fault path).
   - [ ] Investigate the 11 `missed` snapshots captured 2026-11-14 afternoon (all 0 dB reduced
         — a different cause).
   - [ ] Review suggestions left: smack 0–5 ms before a word, double clicks, digital-silence

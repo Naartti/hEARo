@@ -37,6 +37,10 @@ public struct EngineSnapshot: Sendable, Equatable {
     public var cpuPercent: Double
     public var outputDevice: String
     public var snapshotsSaved: Int
+    /// Clips auto-saved around de-smack catches this session (the icon flashes when it grows).
+    public var autoSavedSession: Int = 0
+    /// Auto-saved clips in the last 24 hours (what the daily limit counts).
+    public var autoSavedLast24h: Int = 0
     /// Why the engine isn't processing although switched on (e.g. the new output device can't
     /// be used; hEARo retries). Empty when fine.
     public var problem: String = ""
@@ -96,6 +100,59 @@ public protocol Engine: AnyObject {
     func applySettings(_ settings: EngineSettings)
     /// Offline renderer for the review window (use from a background task).
     var renderer: ClipRenderer { get }
+
+    // MARK: Auto-saving de-smack catches (ADR 0018)
+
+    /// Turn auto-saving on/off and set its limits (the engine clamps them).
+    func setAutoCapture(_ settings: AutoCaptureSettings)
+    /// Defaults and ranges for the settings UI.
+    var autoCaptureLimits: AutoCaptureLimits { get }
+}
+
+/// Auto-save settings: a clip around every de-smack catch, for the dataset (ADR 0018).
+public struct AutoCaptureSettings: Equatable, Sendable {
+    public var enabled: Bool
+    /// At most this many clips per rolling 24 hours.
+    public var dailyCap: Int
+    /// Auto-saved clips you never touched are deleted after this many days.
+    public var retentionDays: Int
+
+    public init(enabled: Bool, dailyCap: Int, retentionDays: Int) {
+        self.enabled = enabled
+        self.dailyCap = dailyCap
+        self.retentionDays = retentionDays
+    }
+
+    /// Within `limits` (both numbers ≥ 1).
+    public func clamped(to limits: AutoCaptureLimits) -> AutoCaptureSettings {
+        AutoCaptureSettings(
+            enabled: enabled, dailyCap: min(max(dailyCap, 1), limits.maxDailyCap),
+            retentionDays: min(max(retentionDays, 1), limits.maxRetentionDays))
+    }
+}
+
+/// Defaults and ranges of `AutoCaptureSettings` (from the engine).
+public struct AutoCaptureLimits: Equatable, Sendable {
+    public var defaultDailyCap: Int
+    public var maxDailyCap: Int
+    public var defaultRetentionDays: Int
+    public var maxRetentionDays: Int
+
+    public init(defaultDailyCap: Int, maxDailyCap: Int, defaultRetentionDays: Int, maxRetentionDays: Int) {
+        self.defaultDailyCap = defaultDailyCap
+        self.maxDailyCap = maxDailyCap
+        self.defaultRetentionDays = defaultRetentionDays
+        self.maxRetentionDays = maxRetentionDays
+    }
+
+    /// The engine's values (`hearo_engine::autocapture`); fakes use these.
+    public static let standard = AutoCaptureLimits(
+        defaultDailyCap: 250, maxDailyCap: 2000, defaultRetentionDays: 31, maxRetentionDays: 365)
+
+    /// Off, at the default limits.
+    public var defaults: AutoCaptureSettings {
+        AutoCaptureSettings(enabled: false, dailyCap: defaultDailyCap, retentionDays: defaultRetentionDays)
+    }
 }
 
 /// Result of importing snapshots.

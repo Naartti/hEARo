@@ -82,6 +82,50 @@ struct AppModelTests {
         #expect(model.iconState == .on)
     }
 
+    /// An auto-saved de-smack catch flashes the ear in the de-smack colour (not the accent), wins
+    /// over a removal glow, then settles.
+    @Test func autoSaveFlashesInTheDeSmackColour() {
+        let engine = FakeEngine(.previewRunning)
+        let model = AppModel(engine: engine)
+        let t0 = Date()
+        var s = engine.state
+        s.autoSavedSession += 1
+        s.modules[3].triggers += 1  // the catch itself also counts as a removal
+        engine.set(s)
+        model.refresh(now: t0)
+        #expect(model.iconState == .autoSaved)
+        #expect(model.iconState.tint == .module("desmack"))
+        #expect(model.iconState.symbol == "ear.badge.checkmark")
+        s.modules[3].triggers += 1
+        engine.set(s)
+        model.refresh(now: t0.addingTimeInterval(0.3))
+        #expect(model.iconState == .autoSaved, "a removal doesn't cut the confirmation short")
+        model.refresh(now: t0.addingTimeInterval(1.3))
+        #expect(model.iconState == .on)
+    }
+
+    @Test func autoCaptureIsOffByDefaultAndRemembered() {
+        let store = MemoryStore()
+        let engine = FakeEngine(.previewRunning)
+        let model = AppModel(engine: engine, settings: store)
+        #expect(model.autoCapture == AutoCaptureSettings(enabled: false, dailyCap: 250, retentionDays: 31))
+        #expect(!engine.calls.contains { $0.hasPrefix("autoCapture") }, "defaults aren't pushed needlessly")
+        model.setAutoCapture(AutoCaptureSettings(enabled: true, dailyCap: 100, retentionDays: 7))
+        #expect(engine.calls.last == "autoCapture=true/100/7")
+        // Next launch: restored and handed to the engine before anything runs.
+        let engine2 = FakeEngine(.previewRunning)
+        let model2 = AppModel(engine: engine2, settings: store)
+        #expect(model2.autoCapture == AutoCaptureSettings(enabled: true, dailyCap: 100, retentionDays: 7))
+        #expect(engine2.calls == ["autoCapture=true/100/7"])
+    }
+
+    @Test func autoCaptureValuesAreClampedToTheEngineLimits() {
+        let engine = FakeEngine(.previewRunning)
+        let model = AppModel(engine: engine, settings: MemoryStore())
+        model.setAutoCapture(AutoCaptureSettings(enabled: true, dailyCap: 0, retentionDays: 100_000))
+        #expect(model.autoCapture == AutoCaptureSettings(enabled: true, dailyCap: 1, retentionDays: 365))
+    }
+
     @Test func snapshotShowsCheckmarkAndCounts() {
         let engine = FakeEngine(.previewRunning)
         let model = AppModel(engine: engine)

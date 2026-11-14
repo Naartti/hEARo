@@ -51,6 +51,8 @@ struct HearoApp: App {
         .defaultWindowPlacement { _, _ in WindowPlacement(size: model.mainTab.defaultSize) }
         .windowResizability(.contentMinSize)
         .defaultLaunchBehavior(.suppressed)
+        // Never reopened at launch, even if it was open at quit (launch stays menu-bar-only).
+        .restorationBehavior(.disabled)
         // Shown while the window is open (hEARo is then a regular app with a Dock icon).
         .commands { MainWindowCommands(model: model) }
     }

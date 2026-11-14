@@ -38,7 +38,7 @@ public struct AppMenu {
     }
 
     public var items: [Item] {
-        // A menu bar app has no standard app menu, so "About" lives here, first.
+        // Without the window hEARo has no app menu (menu-bar-only), so "About" lives here, first.
         var out: [Item] = [.about, .divider] + (inWindow ? [] : [.window]) + [.review, .advanced, .divider, .export, .import, .showInFinder]
         if model.canLaunchAtLogin { out += [.divider, .launchAtLogin(on: model.launchAtLogin)] }
         return out + [.divider, .quit]

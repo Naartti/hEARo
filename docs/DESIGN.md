@@ -80,15 +80,20 @@ experience better then we shouldn't have it. But if it's best practice then we s
 - **Decided: a Dock icon only while the hEARo window is open** (the Docker Desktop / Tailscale
   / 1Password pattern). With no window, hEARo stays menu-bar-only (`LSUIElement`, no Dock icon,
   not in ⌘Tab) — a background utility in the Dock is clutter. Opening the window switches to a
-  regular app (`setActivationPolicy(.regular)` before activating, or the menu bar doesn't
-  appear); closing it switches back to `.accessory`. Launch stays silent (no Dock flash).
-  Supersedes HANDOVER §13 "no Dock icon" for the window case.
+  regular app (`setActivationPolicy(.regular)` before activating, or the menu bar can fail to
+  appear); closing it switches back to `.accessory` and hands focus back to the app you were
+  in. The window drives this (`DockPresence`: appear → regular, close → accessory one run-loop
+  turn later unless it reopened), so every route into the window is covered. Launch stays
+  silent: no Dock flash, and the window is never restored at launch
+  (`.restorationBehavior(.disabled)`). Supersedes HANDOVER §13 "no Dock icon" for the window
+  case.
 - Why: a window kept open for testing must be findable — ⌘Tab, the Dock, Mission Control —
   and gets a real menu bar instead of workarounds.
 - **Menu bar while open** (`MainWindowCommands`): app menu "About hEARo" (same panel as the ⋯
   menu) and **Settings… ⌘,** → Settings tab; **View → Controls ⌘1 · Review ⌘2 · Settings ⌘3**
-  (replaces the hidden zero-opacity shortcut buttons); standard Hide/Quit/Window menus. Each
-  item opens the window on its tab.
+  (replaces the hidden zero-opacity shortcut buttons); standard Hide/Quit/Window menus; Help
+  keeps only the system search field (no help book). With the window open the tab items just
+  switch tabs; otherwise (e.g. ⌘, while the popover is focused) they open the window on it.
 - No "always show in Dock" setting; add one only if asked.
 
 ## Popover (360 pt wide) — current state

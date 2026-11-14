@@ -248,8 +248,14 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
       route shows the Dock icon, puts hEARo in ⌘Tab and shows its menu bar; (c) closing the
       window removes them again; (d) the menu bar has About hEARo, Settings… ⌘, (Settings tab)
       and View → Controls/Review/Settings ⌘1–⌘3. `MainWindowCommands`,
-      `AppModel.openMainWindow` / `mainWindowClosed`; DESIGN.md *Dock icon while the window is
-      open*.
+      `DockPresence`, `AppModel.openMainWindow` / `tabCommand`; DESIGN.md *Dock icon while the
+      window is open*. Checked in the app: opening → Foreground with the menus above; closing →
+      UIElement, no window.
+  - [ ] Follow-up: the ⋯ menu's "Advanced settings…" opens the tab the menu bar calls
+        "Settings…" — rename it to match (and the popover's "Advanced…" link?).
+  - Review notes: HANDOVER §13 left as is (the brief stays frozen; DESIGN.md records the
+    deviation, like the menu bar icon decision). About/save panels open when the window
+    closes may lose their Dock icon with it — accepted, accessory apps show them fine.
 - [x] **Spectrogram in the review window (2026-11-14):** log-frequency (30 Hz–20 kHz) magma
       lane under the waveform, sharing viewport/playhead/axis; marking, zoom and regions work on
       both lanes. ⇧⌘S / header toggle (remembered); resolution menu time 512 / balanced 1024 /

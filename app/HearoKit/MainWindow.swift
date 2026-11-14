@@ -58,31 +58,37 @@ extension AppModel {
     }
 
     /// Testable core of `openMainWindow(_:using:)`: select, show in the Dock, open, activate —
-    /// in that order (the policy must change before activation, or the menu bar doesn't appear).
-    func openMainWindow(
-        _ tab: MainTab, setPolicy: (NSApplication.ActivationPolicy) -> Void = { _ = NSApp?.setActivationPolicy($0) },
-        open: (String) -> Void, activate: () -> Void = { NSApp?.activate() }
-    ) {
+    /// in that order (the policy must change before activation, or the menu bar can fail to
+    /// appear).
+    func openMainWindow(_ tab: MainTab, open: (String) -> Void, activate: () -> Void = { NSApp?.activate() }) {
         show(tab)
-        setPolicy(.regular)
+        dock.willOpenWindow()
         open(mainWindowID)
         activate()
     }
 
-    /// The hEARo window closed: back to menu-bar-only (no Dock icon, not in ⌘Tab).
-    func mainWindowClosed(setPolicy: (NSApplication.ActivationPolicy) -> Void = { _ = NSApp?.setActivationPolicy($0) }) {
-        setPolicy(.accessory)
+    /// A menu bar tab command: switch tabs while the window is open, else open it on `tab`.
+    func tabCommand(_ tab: MainTab, open: (String) -> Void, activate: () -> Void = { NSApp?.activate() }) {
+        if dock.isWindowOpen { show(tab) } else { openMainWindow(tab, open: open, activate: activate) }
     }
 }
 
-/// The menu bar hEARo shows while its window is open (and so it is a regular app): a View menu
-/// with the tabs (⌘1–⌘3) and the app menu's Settings… (⌘,) opening the Settings tab. Each item
-/// opens the window on its tab, so it works whether or not the window is key.
+/// The menu bar hEARo shows while its window is open (and so it is a regular app): About, the
+/// app menu's Settings… (⌘,) for the Settings tab, View → the tabs (⌘1–⌘3), no Help menu
+/// (there is no help book). The shortcuts may also fire while the popover is focused; they
+/// then open the window on that tab, which is fine.
 public struct MainWindowCommands: Commands {
-    /// The View menu's tab items, in toolbar order.
-    static let viewItems = MainTab.allCases
-    /// The tab the app menu's Settings… opens.
-    static let settingsTab = MainTab.settings
+    struct Item: Identifiable {
+        let title: String
+        let tab: MainTab
+        let shortcut: Character
+        var id: String { title }
+    }
+
+    /// Settings… (app menu), then the View menu's tabs in toolbar order.
+    static let items: [Item] =
+        [Item(title: "Settings…", tab: .settings, shortcut: ",")]
+        + MainTab.allCases.map { Item(title: $0.title, tab: $0, shortcut: $0.shortcut) }
 
     let model: AppModel
 
@@ -93,28 +99,25 @@ public struct MainWindowCommands: Commands {
             Button(AppMenu.Item.about.title) { AppMenu.showAbout() }
         }
         CommandGroup(replacing: .appSettings) {
-            OpenTabButton(model: model, tab: Self.settingsTab, title: "Settings…", shortcut: ",")
+            TabCommandButton(model: model, item: Self.items[0])
         }
         CommandGroup(before: .toolbar) {
-            ForEach(Self.viewItems) { tab in
-                OpenTabButton(model: model, tab: tab, title: tab.title, shortcut: tab.shortcut)
-            }
+            ForEach(Self.items.dropFirst()) { TabCommandButton(model: model, item: $0) }
             Divider()
         }
+        CommandGroup(replacing: .help) {}
     }
 }
 
-/// A menu command that opens the hEARo window on a tab (a view, for the scene's `openWindow`).
-private struct OpenTabButton: View {
+/// A menu command for a tab (a view, for the scene's `openWindow`).
+private struct TabCommandButton: View {
     let model: AppModel
-    let tab: MainTab
-    let title: String
-    let shortcut: Character
+    let item: MainWindowCommands.Item
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Button(title) { model.openMainWindow(tab, using: openWindow) }
-            .keyboardShortcut(KeyEquivalent(shortcut), modifiers: .command)
+        Button(item.title) { model.tabCommand(item.tab, open: { openWindow(id: $0) }) }
+            .keyboardShortcut(KeyEquivalent(item.shortcut), modifiers: .command)
     }
 }
 
@@ -152,10 +155,13 @@ public struct MainWindowView: View {
             .environment(\.liveViewOnScreen, onScreen)
             .background(
                 WindowObserver(
-                    attached: { window = $0 }, onScreen: { onScreen = $0 },
+                    attached: {
+                        window = $0
+                        model.dock.windowAppeared()
+                    }, onScreen: { onScreen = $0 },
                     willClose: {
                         review.windowClosed()
-                        model.mainWindowClosed()
+                        model.dock.windowClosed()
                     }))
             .onChange(of: model.mainTab) { old, new in resize(from: old, to: new) }
             .navigationTitle("hEARo")

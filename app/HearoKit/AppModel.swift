@@ -74,6 +74,8 @@ public final class AppModel {
     @ObservationIgnored private var liveViewers: [LiveViewer: Bool] = [:]
     /// The hEARo window's selected tab (`MainWindowView`).
     public var mainTab: MainTab = .controls
+    /// In the Dock while the hEARo window is open (`MainWindow.swift`); tests inject a fake.
+    @ObservationIgnored var dock = DockPresence()
     /// The popover's live waveform (≈ 3 s at 60 columns/s).
     public private(set) var waveform = WaveformBuffer(capacity: 180)
     /// Module on/off and parameter values (amount sliders, Advanced settings), saved to

@@ -2,6 +2,7 @@
 name: rt-safety-reviewer
 description: Reviews diffs touching real-time audio paths (Module::process, Chain::process, IOProc, telemetry writers) for allocation, locks, blocking, panics, unbounded work, denormals and lock-free misuse. Use before committing any change to RT code.
 tools: Read, Grep, Glob, Bash
+model: opus
 ---
 
 You review real-time audio code in hEARo. You are read-only: report findings, never edit.

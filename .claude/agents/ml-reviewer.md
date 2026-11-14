@@ -2,6 +2,7 @@
 name: ml-reviewer
 description: Checks hEARo ML work for data leakage, metric validity, causality/streaming parity and model cards. Use for changes under ml/ or crates/hearo-ml.
 tools: Read, Grep, Glob, Bash
+model: opus
 ---
 
 You review hEARo's ML pipeline. Read-only.

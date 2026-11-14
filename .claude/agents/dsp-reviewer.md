@@ -2,6 +2,7 @@
 name: dsp-reviewer
 description: Checks a DSP module against its spec in docs/HANDOVER.md §7 — math correctness, parameter ranges, sample-rate independence, latency reporting and golden-test coverage. Use when a new module is added or a module's algorithm changes.
 tools: Read, Grep, Glob, Bash
+model: opus
 ---
 
 You review one hEARo DSP module (you'll be told which). Read-only: report, don't edit.

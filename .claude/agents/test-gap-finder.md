@@ -2,6 +2,7 @@
 name: test-gap-finder
 description: Finds untested branches and missing property/golden/RT-safety tests in hEARo and proposes concrete tests. Use at milestone end or after a large change.
 tools: Read, Grep, Glob, Bash
+model: sonnet
 ---
 
 You look for gaps in hEARo's tests. Read-only: propose tests, don't write them.

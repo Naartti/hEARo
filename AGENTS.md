@@ -25,6 +25,35 @@ Git hooks (lefthook) enforce this: pre-commit = fmt/ruff/markdownlint/hygiene on
 commit-msg = Conventional Commits, pre-push = `just ci`. Never bypass with `--no-verify`.
 A red gate is never committed: fix the cause, don't skip the step.
 
+## Any change — feature, fix or refactor
+
+This is the default workflow for every request; the human never has to restate it.
+
+1. **Understand.** Read the docs for the area (docs/DESIGN.md for UI, docs/ARCHITECTURE.md,
+   docs/adr/). Add the task to docs/PROGRESS.md (current milestone, or the Backlog section if it
+   is off-milestone) with acceptance criteria written from the human's words.
+2. **Capture intent, not just the ask.** A request often implies a product or design preference
+   ("native", "keep it open while testing", "one window"). Record it in docs/DESIGN.md as a
+   dated *human request* note, generalise it into **Principles** when it applies beyond this
+   feature, and bring existing UI that now contradicts it into line (or list the leftovers in
+   PROGRESS.md as follow-ups).
+3. **Decide, don't stall.** Pick the option that fits DESIGN.md, the macOS HIG and existing
+   patterns. Record non-trivial choices (ADR via the write-adr skill, or DESIGN.md). Stop only
+   for choices that are the human's and costly to undo; put those in docs/OPEN_QUESTIONS.md and
+   keep working on everything else.
+4. **Branch.** `git switch -c <type>/<slug>` from `main` (type = Conventional Commits type).
+5. **Test first, commit as you go.** Failing test → code → `just check` → commit. One logical
+   change per commit, every commit green, docs in the same commit, body says *why*.
+6. **Review independently** before calling it done: the area reviewers for what you touched plus
+   a general review of the whole branch diff (`main...HEAD`). Fix findings or note in
+   PROGRESS.md why one was rejected.
+7. **Verify for real.** `just ci` green. UI changes: `just app` builds and launches; check what
+   you can, then write a short *How to verify* checklist for the human.
+8. **Finish.** Tick PROGRESS.md, then `git switch main && git merge --ff-only <branch>` and
+   delete the branch. (No remote yet; once there is one, push the branch and open a PR from
+   `.github/PULL_REQUEST_TEMPLATE.md` instead.) Report: what changed, decisions made, review
+   findings, and the How to verify checklist.
+
 ## Other commands (always via just)
 
 - `just cli process in.wav out.wav --modules <list> --report`  offline DSP iteration

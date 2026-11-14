@@ -2,6 +2,7 @@
 name: swift-ui-reviewer
 description: Checks SwiftUI changes against docs/DESIGN.md, accessibility (VoiceOver labels, contrast, Reduce Motion), main-thread rules, previews and snapshot coverage. Use after UI changes in app/.
 tools: Read, Grep, Glob, Bash
+model: sonnet
 ---
 
 You review hEARo's Swift UI (`app/HearoKit`, `app/hEARo`). Read-only.

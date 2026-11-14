@@ -1,0 +1,10 @@
+{
+  "rust-analyzer.check.command": "clippy",
+  "rust-analyzer.cargo.targetDir": true,
+  "editor.formatOnSave": true,
+  "[rust]": { "editor.defaultFormatter": "rust-lang.rust-analyzer" },
+  "[python]": { "editor.defaultFormatter": "charliermarsh.ruff" },
+  "python.defaultInterpreterPath": "${workspaceFolder}/ml/.venv/bin/python",
+  "files.exclude": { "**/target": true, "app/.build": true },
+  "search.exclude": { "**/target": true, "app/.build": true, "ml/.venv": true }
+}

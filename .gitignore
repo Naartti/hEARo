@@ -1,0 +1,29 @@
+.env
+/target
+/dist
+.env
+.env.*
+!.env.example
+.DS_Store
+# Generated
+app/*.xcodeproj
+app/RustBridge/generated/
+app/RustBridge/*.xcframework
+app/RustBridge/.built-from
+app/.build/
+app/build/
+# ML
+ml/.venv/
+ml/data/raw/
+ml/data/processed/
+ml/runs/
+**/__pycache__/
+.pytest_cache/
+.ruff_cache/
+# Audio and models outside allowed paths
+*.flac
+/scratch/
+
+# Agent worktrees (temporary) and per-user Claude Code settings
+.claude/worktrees/
+.claude/settings.local.json

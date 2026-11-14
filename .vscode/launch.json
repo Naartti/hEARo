@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "hearo process (speech_clicks)",
+      "cargo": { "args": ["build", "-p", "hearo-cli", "--bin", "hearo"] },
+      "args": ["process", "scratch/signals/speech_clicks.wav", "scratch/out.wav", "--report"],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "hearo-dsp tests",
+      "cargo": { "args": ["test", "--no-run", "-p", "hearo-dsp", "--lib"] },
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

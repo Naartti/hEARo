@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "rust-lang.rust-analyzer",
+    "swiftlang.swift-vscode",
+    "vadimcn.vscode-lldb",
+    "ms-python.python",
+    "charliermarsh.ruff",
+    "tamasfe.even-better-toml",
+    "DavidAnson.vscode-markdownlint",
+    "bierner.markdown-mermaid",
+    "nefrob.vscode-just-syntax"
+  ]
+}

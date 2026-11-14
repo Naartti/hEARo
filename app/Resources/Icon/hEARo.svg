@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!--
+    hEARo app icon, master artwork (all sizes >= 64 px). Rendered by scripts/make-icon.swift
+    (`just icon`, run automatically by `just app` / `just release`); never edit the generated
+    .icns. macOS icon grid: 824 x 824 body at (100,100) on a 1024 canvas, transparent margin.
+    Story: harsh sound (a coral spike) comes in from the left and is smoothed into calm mint
+    bars before it reaches the ear. Sizes <= 32 px use hEARo-small.svg (ear only).
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#5A9BFF"/>
+      <stop offset="0.55" stop-color="#4B55E6"/>
+      <stop offset="1" stop-color="#2E1A8C"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="ear" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#E4E8FF"/>
+    </linearGradient>
+    <filter id="blur" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+  </defs>
+
+  <!-- base: squircle with a diagonal blue to indigo gradient and a soft top sheen -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#sheen)"/>
+
+  <!-- depth: the artwork again, dark, blurred and offset down -->
+  <g transform="translate(0 18)" opacity="0.35" filter="url(#blur)" fill="none" stroke="#120A4A"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 420 470 C 420 330 510 250 610 250 C 720 250 790 330 790 440 C 790 540 720 580 690 640 C 665 690 660 780 575 785 C 525 788 490 760 475 725" stroke-width="66"/>
+    <path d="M 520 470 C 520 405 565 365 615 365 C 670 365 695 410 688 455 C 680 500 635 515 620 560" stroke-width="54"/>
+    <path d="M 180 565 V 615 M 230 450 V 730 M 280 560 V 620 M 330 540 V 640 M 380 525 V 655" stroke-width="30"/>
+  </g>
+
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- ear: outer helix down to the lobe, then the inner antihelix curl -->
+    <path d="M 420 470 C 420 330 510 250 610 250 C 720 250 790 330 790 440 C 790 540 720 580 690 640 C 665 690 660 780 575 785 C 525 788 490 760 475 725"
+          stroke="url(#ear)" stroke-width="66"/>
+    <path d="M 520 470 C 520 405 565 365 615 365 C 670 365 695 410 688 455 C 680 500 635 515 620 560"
+          stroke="url(#ear)" stroke-width="54"/>
+    <!-- waveform: a harsh spike on the left, a calm even envelope towards the ear -->
+    <path d="M 180 565 V 615" stroke="#FF8A6E" stroke-width="30"/>
+    <path d="M 230 450 V 730" stroke="#FF8A6E" stroke-width="30"/>
+    <path d="M 280 560 V 620" stroke="#C7B9C9" stroke-width="30"/>
+    <path d="M 330 540 V 640" stroke="#8EEBD8" stroke-width="30"/>
+    <path d="M 380 525 V 655" stroke="#6FF5DA" stroke-width="30"/>
+  </g>
+</svg>

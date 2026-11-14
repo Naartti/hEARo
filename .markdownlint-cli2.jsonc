@@ -1,0 +1,11 @@
+{
+  "config": {
+    "default": true,
+    "MD013": false,
+    "MD024": { "siblings_only": true },
+    "MD033": false,
+    "MD041": false,
+    "MD060": false
+  },
+  "ignores": [".claude/worktrees/**", "dist/**", "target/**", "**/node_modules/**", "ml/.venv/**", "app/.build/**", "docs/HANDOVER.md"]
+}

@@ -1,0 +1,63 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.100"
+license = "MIT OR Apache-2.0"
+# repository/homepage: TODO(owner) — set (and inherit in each crate) once the public URL
+# exists; deliberately left unset. Nothing goes to crates.io: every crate inherits
+# `publish = false`. Fields no crate inherits would trigger cargo's
+# `unused_workspace_package_fields` warning, so authors/keywords live in the crates when needed.
+publish = false
+
+[workspace.dependencies]
+# Internal
+hearo-dsp = { path = "crates/hearo-dsp" }
+hearo-testkit = { path = "crates/hearo-testkit" }
+hearo-engine = { path = "crates/hearo-engine" }
+# External (exact pins; verify before bumping)
+realfft = "=3.5.1"
+hound = "=3.5.1"
+clap = { version = "=4.6.7", features = ["derive"] }
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
+anyhow = "=1.0.104"
+# macOS Core Audio (ADR 0010)
+objc2 = "=0.6.5"
+objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSArray", "NSString", "NSValue", "NSDictionary", "NSObject"] }
+objc2-core-foundation = { version = "=0.3.2", default-features = false, features = ["std", "CFBase", "CFString", "CFDictionary"] }
+objc2-core-audio = "=0.3.2"
+objc2-core-audio-types = "=0.3.2"
+# FFI (ADR 0002)
+uniffi = "=0.32.2"
+# Dev / test
+proptest = "=1.12.0"
+divan = "=0.1.21"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+# RT-safety helpers: flag common allocation/panic sources; RT modules opt into stricter lints.
+dbg_macro = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+todo = "warn"
+unimplemented = "warn"
+
+[profile.release]
+debug = 1
+lto = "thin"
+codegen-units = 1
+
+[profile.bench]
+debug = 1
+
+# Tests run optimized DSP so golden tests over minutes of audio stay fast.
+[profile.test]
+opt-level = 2

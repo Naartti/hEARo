@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!--
+    hEARo app icon, small-size variant (16 and 32 px images; see hEARo.svg for the master).
+    At those sizes the waveform bars and the shadow turn to mush, so this is the ear alone:
+    centred, enlarged, heavier strokes, flat white. Same base and geometry as the master.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#5A9BFF"/>
+      <stop offset="0.55" stop-color="#4B55E6"/>
+      <stop offset="1" stop-color="#2E1A8C"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <g fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round"
+     transform="translate(512 517) scale(1.12) translate(-605 -517)">
+    <path d="M 420 470 C 420 330 510 250 610 250 C 720 250 790 330 790 440 C 790 540 720 580 690 640 C 665 690 660 780 575 785 C 525 788 490 760 475 725" stroke-width="84"/>
+    <path d="M 520 470 C 520 405 565 365 615 365 C 670 365 695 410 688 455 C 680 500 635 515 620 560" stroke-width="70"/>
+  </g>
+</svg>

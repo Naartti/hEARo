@@ -1,0 +1,25 @@
+[package]
+name = "hearo-ffi"
+description = "UniFFI control plane between the Swift app and the hEARo engine (ADR 0002)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+# staticlib: linked into the app via an XCFramework; cdylib: read by uniffi-bindgen;
+# lib: Rust tests.
+crate-type = ["lib", "staticlib", "cdylib"]
+
+[dependencies]
+hearo-dsp.workspace = true
+hearo-engine.workspace = true
+hearo-testkit.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+# No "cli" feature: the bindings generator lives in hearo-bindgen and is not shipped in the app.
+uniffi.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>hEARo</string>
+	<key>CFBundleExecutable</key>
+	<string>hEARo</string>
+	<key>CFBundleIconFile</key>
+	<string>hEARo</string>
+	<key>CFBundleIdentifier</key>
+	<string>dev.hearo.app</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>hEARo</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>26.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>© 2026 The hEARo contributors</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>hEARo listens to the sound your Mac plays so it can smooth out clicks, mouth smacks, harsh "s" sounds and hum before they reach your ears. Everything happens on this Mac, in real time: nothing is recorded or sent anywhere. The only exception is a short snapshot you save yourself with the snapshot hotkey, and it stays on this Mac.</string>
+	<key>HearoGitSHA</key>
+	<string>unknown</string>
+	<key>HearoBuildConfiguration</key>
+	<string>unknown</string>
+	<key>HearoBuildDate</key>
+	<string>unknown</string>
+</dict>
+</plist>

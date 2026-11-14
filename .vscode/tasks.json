@@ -1,0 +1,10 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "just check", "type": "shell", "command": "just check", "group": { "kind": "build", "isDefault": true }, "problemMatcher": ["$rustc"] },
+    { "label": "just ci", "type": "shell", "command": "just ci", "problemMatcher": ["$rustc"] },
+    { "label": "just test-golden", "type": "shell", "command": "just test-golden", "group": "test", "problemMatcher": ["$rustc"] },
+    { "label": "just bench", "type": "shell", "command": "just bench", "problemMatcher": [] },
+    { "label": "just app", "type": "shell", "command": "just app", "problemMatcher": [] }
+  ]
+}

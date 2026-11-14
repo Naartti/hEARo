@@ -1,0 +1,29 @@
+# Git hooks — the local CI enforcement layer (there is no hosted CI).
+# Install with `lefthook install` (done by `just bootstrap`).
+# Commands run through `mise x --` so hooks work from any shell or GUI git client, even when
+# mise isn't activated.
+pre-commit:
+  parallel: true
+  commands:
+    rustfmt:
+      glob: "*.rs"
+      run: mise x -- cargo fmt --all --check
+    ruff:
+      root: "ml/"
+      glob: "*.py"
+      run: mise x -- uv run --frozen ruff check {staged_files} && mise x -- uv run --frozen ruff format --check {staged_files}
+    markdownlint:
+      glob: "*.md"
+      run: mise x -- markdownlint-cli2 {staged_files}
+    hygiene:
+      run: scripts/check-files.sh
+
+commit-msg:
+  commands:
+    conventional:
+      run: scripts/commit-msg.sh {1}
+
+pre-push:
+  commands:
+    full-ci:
+      run: mise x -- just ci

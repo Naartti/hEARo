@@ -1,0 +1,23 @@
+[package]
+name = "hearo-dsp"
+description = "Pure, real-time-safe DSP for hEARo: modules, chain, analysis. No OS dependencies."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+realfft.workspace = true
+
+[dev-dependencies]
+hearo-testkit.workspace = true
+proptest.workspace = true
+divan.workspace = true
+
+[[bench]]
+name = "chain"
+harness = false
+
+[lints]
+workspace = true

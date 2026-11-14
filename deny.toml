@@ -1,0 +1,55 @@
+# cargo-deny: licenses, advisories, sources. Run via `just deny` (part of `just ci`).
+# Policy (§2): only permissive licenses. Adding one here needs an ADR.
+
+[graph]
+targets = ["aarch64-apple-darwin"]
+all-features = false
+
+[advisories]
+ignore = [
+    # basic-toml is unmaintained (archived). Reached only via uniffi_bindgen → askama, i.e. the
+    # build-time bindings generator (crate hearo-bindgen), which is not shipped in the app. ADR 0013.
+    { id = "RUSTSEC-2026-0374", reason = "build-time only (UniFFI bindgen), no safe upgrade; ADR 0013" },
+]
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+]
+confidence-threshold = 0.8
+unused-allowed-license = "allow"
+# MPL-2.0 (file-level copyleft) only for UniFFI, which HANDOVER §6 prescribes for the Swift
+# bridge. Used unmodified; see ADR 0013 and THIRD_PARTY_NOTICES.md.
+exceptions = [
+    { allow = ["MPL-2.0"], crate = "uniffi" },
+    { allow = ["MPL-2.0"], crate = "uniffi_bindgen" },
+    { allow = ["MPL-2.0"], crate = "uniffi_core" },
+    { allow = ["MPL-2.0"], crate = "uniffi_internal_macros" },
+    { allow = ["MPL-2.0"], crate = "uniffi_macros" },
+    { allow = ["MPL-2.0"], crate = "uniffi_meta" },
+    { allow = ["MPL-2.0"], crate = "uniffi_pipeline" },
+    { allow = ["MPL-2.0"], crate = "uniffi_udl" },
+]
+
+[licenses.private]
+# Our own crates are unpublished; still check them against the allow list.
+ignore = false
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+highlight = "all"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

@@ -120,7 +120,12 @@ import Testing
         let lut = Colormap.magma
         #expect(lut.count == 768)
         // Rec. 709 luma rises from black to pale yellow.
-        let luma = (0..<256).map { 0.2126 * Double(lut[$0 * 3]) + 0.7152 * Double(lut[$0 * 3 + 1]) + 0.0722 * Double(lut[$0 * 3 + 2]) }
+        // Explicit types and named terms: Swift 6.2 (Xcode 26) times out type-checking the
+        // one-line sum.
+        let luma: [Double] = (0..<256).map { (i: Int) -> Double in
+            let r = Double(lut[i * 3]), g = Double(lut[i * 3 + 1]), b = Double(lut[i * 3 + 2])
+            return 0.2126 * r + 0.7152 * g + 0.0722 * b
+        }
         #expect(zip(luma, luma.dropFirst()).allSatisfy { $0 <= $1 + 0.5 })
         #expect(luma[0] < 10 && luma[255] > 230)
     }

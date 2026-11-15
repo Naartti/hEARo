@@ -310,11 +310,16 @@ struct DetailHeader: View {
                 .help(ReviewedHint.explanation)
                 .accessibilityHint(ReviewedHint.explanation)
                 // The caption repeats the hint for sighted users; VoiceOver hears the full one.
-                Text(ReviewedHint.caption(reviewed: annotation.reviewed))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize()
-                    .accessibilityHidden(true)
+                // Both captions take the space of the longer one, so toggling doesn't shift
+                // the header's buttons (Move to Trash) under the pointer.
+                ZStack {
+                    ForEach(ReviewedHint.captions, id: \.self) { Text($0).hidden() }
+                    Text(ReviewedHint.caption(reviewed: annotation.reviewed))
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize()
+                .accessibilityHidden(true)
             }
             Button("Move to Trash", systemImage: "trash", role: .destructive) { model.deleteCurrentClip() }
                 .labelStyle(.iconOnly)
@@ -338,6 +343,9 @@ enum ReviewedHint {
     static func caption(reviewed: Bool) -> String {
         reviewed ? "Every mouth noise marked" : "Mark every mouth noise first"
     }
+
+    /// Every caption, so the header can reserve the widest one's width.
+    static let captions = [false, true].map(caption(reviewed:))
 
     static let explanation =
         "Reviewed means every mouth noise in this clip is marked: unmarked audio is used as clean training data. Return marks reviewed and opens the next clip."

@@ -404,7 +404,9 @@ Deviations / not yet done:
   tooltip and VoiceOver hint explain why — unmarked audio becomes clean training data — and
   name Return (`ReviewedHint`). A caption rather than an alert or a check on Return: the fast
   flow stays one key, and the promise is visible where the decision is made. The caption is
-  hidden from VoiceOver, which hears the full hint on the toggle instead.
+  hidden from VoiceOver, which hears the full hint on the toggle instead. It keeps the width
+  of the longer text in both states, so the buttons beside it (Move to Trash) don't move when
+  the toggle flips.
 - Region classes are stored snake_case (`lip_smack`, `mouth_click`, `plosive`, `breath`,
   `filled_pause`, `other`), matching the `hearo dataset` proposal spelling.
 - Processed A/B is **B** (a toggle at the same position), not ⌥Space as first sketched.

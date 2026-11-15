@@ -2,7 +2,8 @@
 # PreToolUse(Bash): block hook bypasses and force pushes; ask before gh leaves this repo.
 # Tests: scripts/test-hooks.sh (run by `just check`).
 set -euo pipefail
-cmd="$(python3 "$(dirname "$0")/_input.py" tool_input.command)"
+input="$(cat)"
+cmd="$(python3 "$(dirname "$0")/_input.py" tool_input.command <<<"$input")"
 if [[ "$cmd" =~ (^|[[:space:]])--no-verify([[:space:]]|$) ]]; then
   echo "Blocked: --no-verify skips the local CI hooks. Fix the failing check instead." >&2; exit 2
 fi
@@ -20,5 +21,11 @@ if [[ "$cmd" =~ (^|[\;\&\|$'\n'])[[:space:]]*git[[:space:]]+commit ]]; then
   fi
 fi
 # Last: prints a PreToolUse "ask" decision (JSON on stdout) when gh may reach another repo.
-python3 "$(dirname "$0")/gh_scope.py" <<<"$cmd"
+# If the check itself fails, ask rather than let an auto-allowed command through unchecked.
+cwd="$(python3 "$(dirname "$0")/_input.py" cwd <<<"$input" || true)"
+root="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}"
+if ! out="$(python3 "$(dirname "$0")/gh_scope.py" "${cwd:-$PWD}" "$root" <<<"$cmd")"; then
+  out='{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask", "permissionDecisionReason": "gh scope check failed"}}'
+fi
+[[ -n "$out" ]] && echo "$out"
 exit 0

@@ -5,9 +5,17 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 guard="$root/.claude/hooks/bash-guard.sh"
 fail=0
 
-outcome() { # $1 = command → allow | ask | block
+# A fake `gh` for the PR-author lookup in `gh pr checkout`: prints $FAKE_PR_AUTHOR.
+fakebin="$(mktemp -d)"
+trap 'rm -rf "$fakebin"' EXIT
+printf '#!/bin/sh\nprintf "%%s\\n" "$FAKE_PR_AUTHOR"\n' >"$fakebin/gh"
+chmod +x "$fakebin/gh"
+export PATH="$fakebin:$PATH" FAKE_PR_AUTHOR=""
+CWD="$root"
+
+outcome() { # $1 = command → allow | ask | block   (hook cwd = $CWD)
   local json out code=0
-  json="$(python3 -c 'import json,sys; print(json.dumps({"tool_input": {"command": sys.argv[1]}}))' "$1")"
+  json="$(python3 -c 'import json,sys; print(json.dumps({"cwd": sys.argv[2], "tool_input": {"command": sys.argv[1]}}))' "$1" "$CWD")"
   out="$(CLAUDE_PROJECT_DIR="$root" "$guard" <<<"$json" 2>/dev/null)" || code=$?
   if [[ "$code" == 2 ]]; then echo block
   elif [[ "$code" != 0 ]]; then echo "error($code)"
@@ -65,12 +73,24 @@ expect ask 'gh api --method=put repos/Naartti/hEARo/pulls/5/merge'
 expect ask 'gh api repos/Naartti/hEARo/issues/1/comments -f body=x'
 expect ask 'gh api graphql -f query=x'
 expect ask 'gh pr checkout some-branch'
+# Quoting, expansion and directory tricks.
+expect ask "gh pr list --re''po someone/else"
+expect ask 'gh pr list -"R" someone/else'
+expect ask "export GH_R''EPO=someone/else; gh pr list"
+expect ask "gh pr view https://github.com/some''one/else/pull/1"
+expect ask 'r=someone/else; gh pr list --repo $r'
+expect ask 'gh api repos/Naartti/hEARo/issues/1/comments -fbody=x'
+expect ask 'gh api repos/Naartti/hEARo/issues/1/comments -XPOST'
+expect ask 'cd ../other-clone && gh pr comment 1 --body x'
+expect ask 'git -C ../other-clone status && gh pr list'
+CWD=/tmp expect ask 'gh pr comment 1 --body x'
+CWD="$root/docs" expect allow 'gh pr list'
 
 # Checking out a PR runs its code in `just ci`: only Dependabot's or the owner's.
-HEARO_TEST_PR_AUTHOR=app/dependabot expect allow 'gh pr checkout 3'
-HEARO_TEST_PR_AUTHOR=Naartti expect allow 'gh pr checkout 4 && just ci'
-HEARO_TEST_PR_AUTHOR=stranger expect ask 'gh pr checkout 9'
-HEARO_TEST_PR_AUTHOR='' expect ask 'gh pr checkout 9'
+FAKE_PR_AUTHOR=app/dependabot expect allow 'gh pr checkout 3'
+FAKE_PR_AUTHOR=Naartti expect allow 'gh pr checkout 4 && just ci'
+FAKE_PR_AUTHOR=stranger expect ask 'gh pr checkout 9'
+FAKE_PR_AUTHOR='' expect ask 'gh pr checkout 9'
 
 # Existing rules still hold.
 expect block 'git commit --no-verify -m x'

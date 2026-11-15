@@ -291,3 +291,70 @@ fn stop_consonants_are_not_ducked() {
     assert!(frac <= 0.05, "{ducked}/{} stop bursts ducked ({:.0}%)", bursts.len(), frac * 100.0);
     assert!(change < 1.0, "stop bursts lost {change:.1} dB");
 }
+
+/// Events from a mono run through one configured de-smack (latency-compensated clock).
+fn events_with(input: &[f32], sr: f32, m: DeSmack) -> Vec<Event> {
+    let mut chain = Chain::new(vec![Box::new(m) as Box<dyn Module>]);
+    chain.prepare(sr, 512, 1);
+    let lat = chain.latency_samples();
+    let mut buf: Vec<f32> = input.iter().copied().chain(std::iter::repeat_n(0.0, lat)).collect();
+    let mut events = Vec::new();
+    for chunk in buf.chunks_mut(512) {
+        chain.process(&mut AudioBlock::from_planar(chunk, 1));
+        events.extend_from_slice(chain.telemetry().events());
+        chain.telemetry_mut().clear_events();
+    }
+    events
+}
+
+fn found(events: &[Event], smacks: &[Injected], sr: f32) -> usize {
+    smacks.iter().filter(|s| events.iter().any(|e| matched(e, s, sr))).count()
+}
+
+/// Real catches the human rejected (2026-11-15) were mostly bursts far quieter than the speech
+/// around them; "Below speech" sets how far below the speech level a smack may peak and still be
+/// ducked. The synthetic smacks peak a few dB under the speech level: a 0 dB setting must leave
+/// them all alone, the widest setting must find them like the default does.
+#[test]
+fn below_speech_gate_leaves_quieter_smacks_alone() {
+    let sr = 48_000.0;
+    let (input, smacks) = speech_with_pause_smacks(sr, 30.0, 71, 20, (-22.0, -10.0), FLOOR_DB);
+    let with = |db: f32| {
+        let mut m = DeSmack::new();
+        let key = m.params().iter().position(|p| p.key == "loudness").expect("loudness param");
+        m.set_param(key, db);
+        found(&events_with(&input, sr, m), &smacks, sr)
+    };
+    let (none, wide, default) = (with(0.0), with(48.0), found(&events_with(&input, sr, DeSmack::new()), &smacks, sr));
+    eprintln!("MARGIN below speech: {none}/{n} at 0 dB, {default} default, {wide} at 48 dB", n = smacks.len());
+    assert!(none * 10 <= smacks.len(), "{none}/{} smacks ducked although quieter than speech", smacks.len());
+    assert!(default * 10 >= smacks.len() * 9, "default found only {default}/{}", smacks.len());
+    assert!(wide >= default, "opening the gate lost smacks ({wide} < {default})");
+}
+
+/// Dull bursts in pauses (thumps, low mouth noise: most of their energy below 1.5 kHz) were the
+/// other common false positive; a smack is bright.
+#[test]
+fn dull_bursts_in_pauses_are_left_alone() {
+    const DULL_HF_MIX: f32 = 0.03;
+    let sr = 48_000.0;
+    let (mut input, gaps) = hearo_testkit::signals::speech_like_with_gaps(sr, 30.0, 72);
+    let floor = pink(&mut Rng::new(73), input.len(), 10f32.powf(-80.0 / 20.0));
+    add_at(&mut input, &floor, 0);
+    let mut rng = Rng::new(74);
+    let mut bursts = Vec::new();
+    for g in gaps.iter().filter(|g| g.len >= ms(sr, 75.0) && g.start > ms(sr, 500.0)).step_by(2).take(20) {
+        // A loud smack-shaped burst low-passed at 500 Hz, plus a faint bright copy so its HF still
+        // jumps far above the pause floor: it triggers the detector, but most energy is dull.
+        let mut lp = [hearo_dsp::filters::Biquad::lowpass(sr as f64, 500.0, 0.707); 2];
+        let raw = hearo_testkit::signals::smack_len(sr, &mut rng, 0.3, 0.012);
+        let dull: Vec<f32> =
+            raw.iter().map(|&v| lp.iter_mut().fold(v as f64, |x, f| f.tick(x)) as f32 + DULL_HF_MIX * v).collect();
+        let at = g.start + ms(sr, 20.0);
+        add_at(&mut input, &dull, at);
+        bursts.push(Injected { start: at, len: dull.len() });
+    }
+    let n = found(&events_with(&input, sr, DeSmack::new()), &bursts, sr);
+    eprintln!("MARGIN dull bursts: {n}/{} ducked", bursts.len());
+    assert!(n * 10 <= bursts.len(), "{n}/{} dull bursts ducked", bursts.len());
+}

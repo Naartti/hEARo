@@ -7,6 +7,17 @@ is 0.1.0.
 
 ## Unreleased
 
+### Added
+
+- `hearo dataset eval`: score a detector against your reviewed snapshots (regions found,
+  false positives, catches you rejected in review).
+
+### Changed
+
+- De-smack leaves quiet and dull bursts alone: a smack must peak within *Below speech* (new
+  setting, 18 dB) of the speech level and be mostly above 1.5 kHz. On 106 reviewed clips this
+  halves the false positives (126 → 60) for 3 of 37 smacks.
+
 ## [0.1.0] - 2026-11-15
 
 ### Added

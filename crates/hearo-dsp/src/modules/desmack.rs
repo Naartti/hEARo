@@ -81,8 +81,12 @@ const RISING_LIN: f32 = 3.981_071_7; // +6 dB
 const MIN_PAUSE_MS: f32 = 8.0;
 /// A burst within this long after a qualifying pause still counts as "in the pause".
 const PAUSE_GRACE_MS: f32 = 3.0;
+/// A smack's energy above 1.5 kHz must be at most this many dB below its broadband energy
+/// (bright). Dull bursts in pauses — thumps, breath, low mouth noise — were the human-rejected
+/// catches' commonest shape (2026-11-15).
+const SALIENT_HF_SHARE_DB: f32 = 8.0;
 
-const PARAMS: [ParamDesc; 3] = [
+const PARAMS: [ParamDesc; 4] = [
     ParamDesc {
         key: "threshold",
         name: "Threshold",
@@ -110,6 +114,21 @@ const PARAMS: [ParamDesc; 3] = [
         min: 0.0,
         max: 48.0,
         default: 24.0,
+        step: 0.0,
+        choices: &[],
+    },
+    // How far below the speech level a smack may peak and still be ducked: quieter ones are
+    // left alone (most were false positives). Tuned 2026-11-15 on 106 reviewed snapshots
+    // (`hearo dataset eval`): off → 126 false positives, 25 dB → 80, 18 dB → 60, 15 dB → 47,
+    // 12 dB → 32, for 37/36/34/34/33 smacks found. 18 dB is the strictest value at which the
+    // synthetic smacks (−22…−10 dBFS over −20 dBFS RMS speech) keep ≥ 90 % recall.
+    ParamDesc {
+        key: "loudness",
+        name: "Below speech",
+        unit: ParamUnit::Db,
+        min: 0.0,
+        max: 48.0,
+        default: 18.0,
         step: 0.0,
         choices: &[],
     },
@@ -144,6 +163,20 @@ struct Smack {
     /// Linear gain at the bottom of the duck.
     gain: f32,
     reported: bool,
+    /// Speech reference when the burst started (the burst itself mustn't lift it).
+    speech: f32,
+    /// Summed HF (> 1.5 kHz) and broadband power over the burst (while Open).
+    sum_hf: f32,
+    sum_bb: f32,
+}
+
+impl Smack {
+    /// Loud against the speech around it and bright: the smacks the human hears and marks
+    /// (2026-11-15, 108 reviewed auto-saved catches). Quiet or dull bursts in a pause — breath
+    /// noise, room thumps, a speaker's soft mouth noises — were 85 % of the false positives.
+    fn salient(&self, loud_lin: f32, bright_lin: f32) -> bool {
+        self.peak_bb_mid >= self.speech * loud_lin && self.sum_hf >= self.sum_bb * bright_lin
+    }
 }
 
 /// The de-smack module.
@@ -189,6 +222,10 @@ pub struct DeSmack {
     quiet_after: u64,
     prov_quiet: u64,
     events: [Option<Smack>; MAX_EVENTS],
+    loudness_db: f32,
+    /// `−loudness_db` / `−SALIENT_HF_SHARE_DB` as linear power factors.
+    loud_lin: f32,
+    bright_lin: f32,
     delay: MultiDelay,
     gain_now: f32,
 }
@@ -250,6 +287,9 @@ impl DeSmack {
             quiet_after: 0,
             prov_quiet: 0,
             events: [None; MAX_EVENTS],
+            loudness_db: PARAMS[3].default,
+            loud_lin: db_to_pow(-PARAMS[3].default),
+            bright_lin: db_to_pow(-SALIENT_HF_SHARE_DB),
             delay: MultiDelay::default(),
             gain_now: 1.0,
         }
@@ -262,6 +302,7 @@ impl DeSmack {
     /// Feed one (future) mono sample to the detector. `abs` = absolute chain position for telemetry.
     #[inline]
     fn detect(&mut self, mid: f32, side: f32) {
+        let (loud_lin, bright_lin) = (self.loud_lin, self.bright_lin);
         // Clamp so absurd (finite) input can't overflow x² into inf and NaN the envelopes.
         let x = mid.clamp(-1e4, 1e4);
         let sd = side.clamp(-1e4, 1e4);
@@ -304,6 +345,8 @@ impl DeSmack {
                     ev.peak_mid = ev.peak_mid.max(e_hfq);
                     ev.peak_bb = ev.peak_bb.max(e_bb);
                     ev.peak_bb_mid = ev.peak_bb_mid.max(e_q);
+                    ev.sum_hf += hf_p;
+                    ev.sum_bb += bb_p;
                     if i - ev.start > max_len {
                         *slot = None; // too long: a fricative or a real sound, not a smack
                     } else if e_hfq < ev.peak_mid * CONFIRM_DROP_LIN && e_q < ev.peak_bb_mid * CONFIRM_BB_DROP_LIN {
@@ -344,7 +387,11 @@ impl DeSmack {
                             ev.phase = Phase::Closed;
                             ev.reported = true; // not a smack: no event (DSP review)
                         }
-                    } else if ev.duck_from == u64::MAX && out_pos + pre >= ev.start && quiet_ok {
+                    } else if ev.duck_from == u64::MAX
+                        && out_pos + pre >= ev.start
+                        && quiet_ok
+                        && ev.salient(loud_lin, bright_lin)
+                    {
                         // Deadline: the burst is (about to be) playing, and has decayed back to
                         // the pause floor. Only long bursts get here (a short stop burst finishes
                         // its stay-quiet check first; aspiration or voicing keeps a stop far above
@@ -365,7 +412,9 @@ impl DeSmack {
                         if i - ev.quiet_from >= quiet_after {
                             // A smack in a pause. Duck it to about the pause level, within range.
                             let reduction = (pow_to_db(ev.peak_bb) - pow_to_db(ev.bg) - TARGET_ABOVE_BG_DB).max(0.0);
-                            if reduction < MIN_REDUCTION_DB && ev.duck_from == u64::MAX {
+                            if ev.duck_from == u64::MAX
+                                && (reduction < MIN_REDUCTION_DB || !ev.salient(loud_lin, bright_lin))
+                            {
                                 drop_it = true;
                             } else {
                                 if ev.duck_from == u64::MAX {
@@ -438,6 +487,9 @@ impl DeSmack {
                     bg: self.bg,
                     gain: 1.0,
                     reported: false,
+                    speech: self.speech,
+                    sum_hf: 0.0,
+                    sum_bb: 0.0,
                 });
                 self.lock_until = i + self.lockout;
             }
@@ -595,7 +647,11 @@ impl Module for DeSmack {
                 self.pause_db = v;
                 self.pause_lin = db_to_pow(-v);
             }
-            _ => self.range_db = v,
+            2 => self.range_db = v,
+            _ => {
+                self.loudness_db = v;
+                self.loud_lin = db_to_pow(-v);
+            }
         }
     }
 
@@ -608,6 +664,7 @@ impl Module for DeSmack {
             0 => self.threshold_db,
             1 => self.pause_db,
             2 => self.range_db,
+            3 => self.loudness_db,
             _ => f32::NAN,
         }
     }
@@ -632,8 +689,12 @@ mod tests {
         let mut m = DeSmack::new();
         m.set_param(0, 20.0);
         m.set_param(1, 10.0);
+        m.set_param(3, 20.0);
         assert!((m.threshold_lin - 100.0).abs() < 1e-3);
         assert!((m.pause_lin - 0.1).abs() < 1e-6);
+        assert!((m.loud_lin - 0.01).abs() < 1e-6);
+        assert_eq!(m.param(3), 20.0);
+        assert!((DeSmack::new().bright_lin - db_to_pow(-SALIENT_HF_SHARE_DB)).abs() < 1e-9);
     }
 
     #[test]

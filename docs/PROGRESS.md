@@ -172,6 +172,16 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
   - [ ] Auto-save follow-ups (reviews 2026-11-14): surface `skipped_by_cap` and dropped events in
         status; snapshot/preview tests for the new visual states; clip cutting assumes the
         chain's clock never stalls (it doesn't advance on its fault path).
+  - [x] **Auto-catch false positives (human, 2026-11-15):** "lots of false positives on the
+        auto-caught de-smacks" — 92 of 108 reviewed catches rejected. Acceptance: measure on the
+        reviewed snapshots, cut false positives substantially without losing real smacks, keep
+        every golden test. Done: `hearo dataset eval` (scores against all reviewed clips;
+        reproduces 85/92 live rejections offline) and a salience gate — ≤ *below speech*
+        (`loudness`, new param, 18 dB) under the speech level and ≥ −8 dB HF share. FPs 126 →
+        60, rejected re-caught 85 → 35, regions found 37 → 34 / 56. Deep dive 06 tuning log.
+    - [ ] Human: re-listen; if still too eager, try *Below speech* 12–15 dB in Settings
+          (12 dB → 32 FPs, 33 found). Remaining FPs: next look at the 19 missed regions + the
+          FPs left with `just cli dataset eval -v`.
   - [ ] Investigate the 11 `missed` snapshots captured 2026-11-14 afternoon (all 0 dB reduced
         — a different cause).
   - [ ] Review suggestions left: smack 0–5 ms before a word, double clicks, digital-silence

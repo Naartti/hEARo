@@ -171,10 +171,52 @@ pub struct Report {
     pub auto: Score,
     /// Clips that couldn't be read: (stem, why).
     pub skipped: Vec<(String, String)>,
+    /// Scored clips whose sidecar predates recorded live settings (upstream at defaults).
+    pub without_settings: usize,
 }
 
-/// Score `module` over every reviewed snapshot in `dir`, after the modules each clip's live chain
-/// ran before it, with `params` (`module.param=value`) applied.
+/// `(module, param, value)`, as parsed from `--param module.param=value`.
+pub type ParamValue = (String, String, f32);
+
+/// How to rebuild what fed `module` live in one clip.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Replay {
+    /// Upstream modules that were on, in chain order, then `module`.
+    pub keys: Vec<String>,
+    /// Recorded values of the upstream modules.
+    pub params: Vec<ParamValue>,
+    /// The sidecar recorded its live settings; `false` = older clip, every module it lists
+    /// before `module` runs at its defaults (the on/off state wasn't recorded).
+    pub recorded: bool,
+}
+
+/// [`Replay`] for `module` from a sidecar. The scored module itself always runs at its defaults
+/// (plus `--param`), so a change is judged against the factory setting, not the live one.
+pub fn replay(side: &serde_json::Value, module: &str) -> Replay {
+    let upstream = modules::KEYS.iter().copied().take_while(|k| *k != module);
+    let (keys, params, recorded): (Vec<&str>, Vec<ParamValue>, bool) = match snapshots::LiveSettings::from_sidecar(side)
+    {
+        Some(live) => {
+            let keys: Vec<&str> = upstream.filter(|k| live.is_enabled(k)).collect();
+            let params = live
+                .modules
+                .iter()
+                .filter(|m| keys.contains(&m.key.as_str()))
+                .flat_map(|m| m.params.iter().map(|p| (m.key.clone(), p.key.clone(), p.value)))
+                .collect();
+            (keys, params, true)
+        }
+        None => {
+            let listed: Vec<&str> =
+                side["modules"].as_array().map(|a| a.iter().filter_map(|m| m.as_str()).collect()).unwrap_or_default();
+            (upstream.filter(|k| listed.contains(k)).collect(), Vec::new(), false)
+        }
+    };
+    Replay { keys: keys.into_iter().chain(std::iter::once(module)).map(String::from).collect(), params, recorded }
+}
+
+/// Score `module` over every reviewed snapshot in `dir`, replaying the modules that fed it live
+/// ([`replay`]), with `params` (`module.param=value`) applied on top.
 pub fn evaluate(dir: &Path, module: &str, params: &[String]) -> Result<Report> {
     let id = ModuleId::from_key(module).with_context(|| format!("unknown module '{module}'"))?;
     anyhow::ensure!(!target_classes(id).is_empty(), "no labelled class to score '{module}' against");
@@ -200,21 +242,15 @@ pub fn evaluate(dir: &Path, module: &str, params: &[String]) -> Result<Report> {
             }
         };
         let sr = wav.sample_rate as f32;
-        // The live chain up to and including the scored module (what fed it live), in chain order.
-        let live: Vec<String> = side["modules"]
-            .as_array()
-            .map(|a| a.iter().filter_map(|m| m.as_str().map(String::from)).collect())
-            .unwrap_or_default();
-        let keys: Vec<&str> = modules::KEYS
-            .iter()
-            .copied()
-            .take_while(|k| *k != module)
-            .filter(|k| live.iter().any(|m| m == k))
-            .chain(std::iter::once(module))
-            .collect();
+        let plan = replay(&side, module);
+        if !plan.recorded {
+            r.without_settings += 1;
+        }
+        let keys = &plan.keys;
         let mut chain = Chain::new(keys.iter().filter_map(|k| modules::create(k)).collect());
         chain.prepare(sr, 512, wav.channels.len());
-        for (m, param, value) in &params {
+        // The clip's recorded upstream values first, then --param (which wins).
+        for (m, param, value) in plan.params.iter().chain(&params) {
             // A module this clip's live chain didn't run (or after the scored one) has no effect.
             let Some(idx) = keys.iter().position(|k| k == m) else { continue };
             let pidx = chain.module(idx).and_then(|md| md.params().iter().position(|d| d.key == param));
@@ -287,6 +323,14 @@ pub fn write_report(r: &Report, verbose: bool, out: &mut impl Write) -> std::io:
     )?;
     if !r.skipped.is_empty() {
         writeln!(out, "⚠ {} clips skipped (unreadable sidecar or audio)", r.skipped.len())?;
+    }
+    if r.without_settings > 0 {
+        writeln!(
+            out,
+            "ℹ {} clips without recorded live settings: modules before the scored one ran at their \
+             defaults, as listed (saved before hEARo 0.3)",
+            r.without_settings
+        )?;
     }
     Ok(())
 }
@@ -449,6 +493,60 @@ mod tests {
         let off = ["desmack.below_speech=0".to_string(), "declick.sensitivity=1".to_string()];
         let quiet = evaluate(&c.0, "desmack", &off).unwrap();
         assert_eq!(quiet.total.detections, 0, "below_speech 0 dB leaves every smack alone");
+    }
+
+    #[test]
+    fn replay_uses_the_recorded_chain_and_upstream_params() {
+        // Recorded: de-hum off, de-plosive on with a param, de-click on; de-ess is downstream.
+        let side = serde_json::json!({
+            "modules": ["dehum", "deplosive", "declick", "desmack", "deess"],
+            "settings": { "modules": [
+                { "key": "dehum", "enabled": false },
+                { "key": "deplosive", "enabled": true, "params": [{ "key": "max_cut", "value": 6.0 }] },
+                { "key": "declick" },
+                { "key": "desmack", "enabled": true, "params": [{ "key": "below_speech", "value": 18.0 }] },
+                { "key": "deess", "enabled": true, "params": [{ "key": "range", "value": 3.0 }] },
+            ]},
+        });
+        let r = replay(&side, "desmack");
+        assert!(r.recorded);
+        assert_eq!(r.keys, ["deplosive", "declick", "desmack"]);
+        // Upstream values only: the scored module runs at its defaults (+ --param) so a change
+        // is judged against the factory setting, and downstream modules don't feed it.
+        assert_eq!(r.params, [("deplosive".to_string(), "max_cut".to_string(), 6.0)]);
+
+        // Older sidecars: every listed upstream module, at defaults.
+        let old = serde_json::json!({ "modules": ["dehum", "desmack", "deess"] });
+        let r = replay(&old, "desmack");
+        assert!(!r.recorded);
+        assert_eq!(r.keys, ["dehum", "desmack"]);
+        assert!(r.params.is_empty());
+    }
+
+    #[test]
+    fn recorded_settings_are_replayed_end_to_end() {
+        let (c, _) = fixture("recorded");
+        let side_path = c.0.join("snapshot-1-auto.json");
+        let mut side: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&side_path).unwrap()).unwrap();
+        let before = evaluate(&c.0, "desmack", &[]).unwrap();
+        assert_eq!(before.without_settings, 1, "the fixture predates recorded settings");
+        // Recorded: de-hum off (the `modules` list still names it), de-plosive on with a value.
+        side["modules"] = serde_json::json!(["dehum", "deplosive", "desmack"]);
+        side["settings"] = serde_json::json!({ "modules": [
+            { "key": "dehum", "enabled": false },
+            { "key": "deplosive", "enabled": true, "params": [{ "key": "max_cut", "value": 6.0 }] },
+            { "key": "desmack", "enabled": true },
+        ]});
+        std::fs::write(&side_path, serde_json::to_string(&side).unwrap()).unwrap();
+        let after = evaluate(&c.0, "desmack", &[]).unwrap();
+        assert_eq!(after.without_settings, 0);
+        assert_eq!(after.clips.len(), 1);
+        // De-plosive leaves speech-band smacks alone, so the found smacks don't change.
+        assert_eq!(after.total.hit_regions, before.total.hit_regions);
+        let mut out = Vec::new();
+        write_report(&before, false, &mut out).unwrap();
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.contains("1 clips without recorded live settings"), "{text}");
     }
 
     #[test]

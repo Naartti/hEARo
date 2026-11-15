@@ -19,7 +19,7 @@ public struct ControlsView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
-            WaveformView(buffer: model.waveform, names: model.moduleNames)
+            WaveformView(source: model.liveWaveform, names: model.moduleNames)
                 .frame(height: 56)
                 .opacity(model.isOn ? 1 : 0.4)
             Divider()

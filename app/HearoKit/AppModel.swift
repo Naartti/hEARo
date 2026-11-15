@@ -105,8 +105,10 @@ public final class AppModel {
     public var mainTab: MainTab = .controls
     /// In the Dock while the hEARo window is open (`MainWindow.swift`); tests inject a fake.
     @ObservationIgnored var dock = DockPresence()
-    /// The popover's live waveform (≈ 3 s at 60 columns/s).
-    public private(set) var waveform = WaveformBuffer(capacity: 180)
+    /// The live waveform (≈ 3 s at 60 columns/s). Its own observable, so the 30 Hz poll redraws
+    /// only `WaveformView`, never the rest of the controls.
+    public let liveWaveform = LiveWaveform(capacity: 180)
+    public var waveform: WaveformBuffer { liveWaveform.buffer }
     /// Module on/off and parameter values (amount sliders, Settings tab), saved to
     /// `settingsFile` when one is given.
     public let moduleSettings: ModuleSettingsModel
@@ -176,10 +178,10 @@ public final class AppModel {
 
     /// Pull new waveform columns (called at ~30 Hz while the popover is visible).
     public func pollWaveform() {
-        let chunk = engine.waveform(since: waveCursor, maxColumns: waveform.capacity)
-        if chunk.next < waveCursor { waveform.clear() }  // engine restarted
+        let chunk = engine.waveform(since: waveCursor, maxColumns: liveWaveform.buffer.capacity)
+        if chunk.next < waveCursor { liveWaveform.buffer.clear() }  // engine restarted
         waveCursor = chunk.next
-        if !chunk.peaks.isEmpty { waveform.append(chunk) }
+        if !chunk.peaks.isEmpty { liveWaveform.buffer.append(chunk) }
     }
 
     /// Start/stop the waveform poll with the live views (no UI work while none is on screen):

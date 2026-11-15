@@ -303,8 +303,16 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
       popover can open it (window button) and every existing entry (Advanced…, ⋯ / right-click
       Review / Advanced) lands on the right tab; (d) no other separate windows remain.
       `MainWindow.swift`, `ControlsView` (was `PopoverView`), menu entry "Open hEARo Window".
-  - [ ] Found while verifying (on `main` too): the open popover / Controls tab costs ≈ 40 %
+  - [x] Found while verifying (on `main` too): the open popover / Controls tab costs ≈ 40 %
         of a core (app 18 % → 58 % in `top`, processing on) — profile the 30 Hz waveform redraw.
+        Done 2026-11-15 (owner's plan step 2). Acceptance: measured before/after; a waveform
+        poll invalidates only the waveform; no visible change. Cause: `ControlsView` read
+        `model.waveform`, so every 30 Hz poll re-evaluated the whole controls body (header,
+        module rows, sliders). The buffer now lives in its own `@Observable` (`LiveWaveform`)
+        read only inside `WaveformView`. Main-thread cost with the controls on screen
+        (`HEARO_PERF=1 swift test --filter LiveViewCost`, debug build): 7.2 → 1.3 ms per
+        frame, 21.6 % → 3.9 % of a core; the VoiceOver summary is ≈ 0.1 ms of that, the rest is
+        the Canvas. Guarded by `waveformPollOnlyInvalidatesTheWaveform`.
 - [x] **Dock icon while the window is open (human request 2026-11-14):** "if it's best practice
       then we should". Acceptance: (a) no Dock icon, not in ⌘Tab, no menu bar while only the
       menu bar icon/popover is in use, and none at launch; (b) opening the hEARo window by any

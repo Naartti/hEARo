@@ -217,8 +217,16 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
     - [ ] DSP review follow-ups: hold the speech tracker while a burst is open (a loud smack
           lifts the reference ≈ 3 dB for the next one in a cluster); a dull burst that fails the
           gate still keeps the detector busy ≤ 20 ms.
-    - [ ] Auto-save sidecars list every slot in `modules`, not which were enabled or their live
+    - [x] Auto-save sidecars list every slot in `modules`, not which were enabled or their live
           params, so `dataset eval` runs upstream modules at defaults: record both.
+          Done 2026-11-15 (owner's plan step 3a). Acceptance: every sidecar (hotkey, auto, CLI)
+          records on/off + param values; `dataset eval` replays the enabled upstream modules
+          with them; older clips still score (upstream at defaults) and are counted.
+          `snapshots::LiveSettings` (settings.json shape) in a new `settings` key;
+          `eval::replay`. Decision: the scored module runs at defaults + `--param`, not its
+          live values, so a change is judged against the factory setting. Real data
+          (2026-11-15, 230 reviewed clips, none with settings yet): recall 63/92, 222 FPs
+          (177 on rejected spans), unchanged by this.
   - [ ] Investigate the 11 `missed` snapshots captured 2026-11-14 afternoon (all 0 dB reduced
         — a different cause).
   - [ ] Review suggestions left: smack 0–5 ms before a word, double clicks, digital-silence

@@ -15,6 +15,9 @@ section ([docs/dev/RELEASING.md](docs/dev/RELEASING.md)).
   it; your other settings carry over. Old *hEARo* entries may linger in System Settings →
   Privacy & Security → Screen & System Audio Recording and in General → Login Items &
   Extensions: remove them.
+- Snapshots now record which modules were on and their settings, and `hearo dataset eval`
+  replays the modules that ran before the scored one with those settings (older snapshots run
+  them at their defaults, and the report says how many).
 
 ### Fixed
 

@@ -32,6 +32,20 @@ pub enum Cmd {
         #[arg(long, value_delimiter = ',', default_value = "desmack")]
         modules: Vec<String>,
     },
+    /// Score a detector against your reviewed snapshots: recall on marked regions, false
+    /// positives (anything outside them; reviewed clips are exhaustively marked) and how many of
+    /// those are on spans you rejected in review. Local tuning only — clips never leave the Mac.
+    Eval {
+        /// Detector to score.
+        #[arg(long, default_value = "desmack")]
+        module: String,
+        /// Parameter override, `module.param=value` (repeatable).
+        #[arg(long = "param")]
+        params: Vec<String>,
+        /// List every detection and missed region per clip.
+        #[arg(long, short)]
+        verbose: bool,
+    },
 }
 
 pub fn run(cmd: Cmd) -> Result<()> {
@@ -59,6 +73,7 @@ pub fn run(cmd: Cmd) -> Result<()> {
             println!("✔ exported {n} snapshots to {}", out.display());
         }
         Cmd::Propose { dry_run, modules } => propose(&dir, dry_run, &modules)?,
+        Cmd::Eval { module, params, verbose } => crate::eval::run(&module, &params, verbose)?,
         Cmd::Import { archive } => {
             let r = snapshots::import(&archive, &dir).map_err(|e| anyhow::anyhow!("{e}"))?;
             println!(

@@ -185,13 +185,7 @@ struct AppModelTests {
         let model = AppModel(engine: engine)
         let controlsChanged = Flag()
         let waveformChanged = Flag()
-        withObservationTracking {
-            _ = model.snapshot
-            _ = model.isOn
-            _ = model.statusLine
-            _ = model.moduleNames
-            _ = model.liveWaveform
-        } onChange: { controlsChanged.set() }
+        withObservationTracking { readControlsState(model) } onChange: { controlsChanged.set() }
         withObservationTracking { _ = model.liveWaveform.buffer } onChange: { waveformChanged.set() }
 
         engine.nextWaveform = WaveformChunk(next: 2, peaks: [0.5, 0.5], removed: [false, false])
@@ -200,6 +194,32 @@ struct AppModelTests {
         #expect(!controlsChanged.value)
         #expect(waveformChanged.value)
         #expect(model.liveWaveform.buffer.columns.count == 2)
+    }
+
+    /// The 5 Hz status poll doesn't re-render the controls while nothing they show changed
+    /// (`@Observable` skips equal assignments of Equatable values; this guards that).
+    @Test func unchangedStatusPollDoesNotInvalidateTheControls() {
+        let model = AppModel(engine: FakeEngine(.previewRunning))
+        model.refresh()
+        let changed = Flag()
+        withObservationTracking { readControlsState(model) } onChange: { changed.set() }
+        model.refresh()
+        #expect(!changed.value)
+    }
+
+    /// Everything `ControlsView` reads from the model (keep in step with its body).
+    private func readControlsState(_ model: AppModel) {
+        _ = model.snapshot
+        _ = model.isOn
+        _ = model.statusLine
+        _ = model.outputLine
+        _ = model.moduleNames
+        _ = model.iconState
+        _ = model.menuBarSymbol
+        _ = model.infoMessage
+        _ = model.errorMessage
+        _ = model.mainTab
+        _ = model.moduleSettings.settings
     }
 
     @Test func exportAndImportReportResults() {

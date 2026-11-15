@@ -108,7 +108,8 @@ public final class AppModel {
     /// The live waveform (≈ 3 s at 60 columns/s). Its own observable, so the 30 Hz poll redraws
     /// only `WaveformView`, never the rest of the controls.
     public let liveWaveform = LiveWaveform(capacity: 180)
-    public var waveform: WaveformBuffer { liveWaveform.buffer }
+    /// For tests only: a view reading this would redraw at 30 Hz (read `liveWaveform` in a leaf view).
+    var waveform: WaveformBuffer { liveWaveform.buffer }
     /// Module on/off and parameter values (amount sliders, Settings tab), saved to
     /// `settingsFile` when one is given.
     public let moduleSettings: ModuleSettingsModel
@@ -179,9 +180,14 @@ public final class AppModel {
     /// Pull new waveform columns (called at ~30 Hz while the popover is visible).
     public func pollWaveform() {
         let chunk = engine.waveform(since: waveCursor, maxColumns: liveWaveform.buffer.capacity)
-        if chunk.next < waveCursor { liveWaveform.buffer.clear() }  // engine restarted
+        let restarted = chunk.next < waveCursor
         waveCursor = chunk.next
-        if !chunk.peaks.isEmpty { liveWaveform.buffer.append(chunk) }
+        guard restarted || !chunk.peaks.isEmpty else { return }
+        // One assignment per poll: an engine restart clears and refills in a single change.
+        var buffer = liveWaveform.buffer
+        if restarted { buffer.clear() }
+        buffer.append(chunk)
+        liveWaveform.buffer = buffer
     }
 
     /// Start/stop the waveform poll with the live views (no UI work while none is on screen):

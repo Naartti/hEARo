@@ -97,6 +97,10 @@ to retry). Undo later with `@dependabot unignore <dependency>`.
 
 ## 5. Report
 
+Class A merges never add a CHANGELOG.md line (that would break "manifests only"); the release
+adds a *Security* line for each advisory they fixed (docs/dev/RELEASING.md step 1), so name
+the advisory in the report.
+
 End with: merged (PR numbers + versions), PRs opened for the human, ignored/deferred with
 reasons, open security alerts, and a *How to verify* list only if a dependency of
 `hearo-engine`, `hearo-ffi` or the app changed (`just app`, play audio, toggle bypass, switch

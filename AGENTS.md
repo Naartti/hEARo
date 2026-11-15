@@ -48,10 +48,11 @@ This is the default workflow for every request; the human never has to restate i
 4. **Branch.** `git switch -c <type>/<slug>` from `main` (type = Conventional Commits type).
 5. **Test first, commit as you go.** Failing test → code → `just check` → commit. One logical
    change per commit, every commit green, docs in the same commit, body says *why*.
-   A change a user would notice (app, engine behaviour, DSP results, CLI, install, a
-   user-facing dependency fix) also adds a line under *Unreleased* in CHANGELOG.md in that
-   commit, written for the user, not as a commit subject. Refactors, tests, CI, tooling and
-   agent docs need none. What counts: docs/dev/RELEASING.md.
+   A change a user would notice (app, engine behaviour, DSP results, CLI, install) also adds
+   a line under *Unreleased* in CHANGELOG.md in that commit, written for the user, not as a
+   commit subject. Refactors, tests, CI, tooling and agent docs need none; merged Dependabot
+   PRs stay manifest-only and the release adds their *Security* lines. What counts:
+   docs/dev/RELEASING.md.
    Every new code path gets a test, CLI and tooling too: keep I/O at a thin edge (take a
    directory or a writer as an argument, so a test can pass a temp dir or a buffer) and test
    the logic end to end. Before pushing, `just patch-coverage` must pass — a red
@@ -63,8 +64,8 @@ This is the default workflow for every request; the human never has to restate i
 7. **Verify for real.** `just ci` green. UI changes: `just app` builds and launches; check what
    you can, then write a short *How to verify* checklist for the human.
 8. **Finish.** Check `git diff main...HEAD -- CHANGELOG.md`: every user-visible `feat`/`fix`
-   on the branch has its *Unreleased* line. Tick PROGRESS.md (in the branch), `git push -u origin <branch>` (pre-push runs
-   `just ci`), open a PR with `gh pr create` filled from `.github/PULL_REQUEST_TEMPLATE.md`
+   on the branch has its *Unreleased* line. Tick PROGRESS.md (in the branch),
+   `git push -u origin <branch>` (pre-push runs `just ci`), open a PR with `gh pr create` filled from `.github/PULL_REQUEST_TEMPLATE.md`
    (body ends with the How to verify checklist), and wait for `gh pr checks --watch` to go
    green; a red hosted run is fixed like a red local one. The human merges (rebase merge on
    GitHub, branch auto-deleted) unless they asked you to; afterwards `git switch main && git

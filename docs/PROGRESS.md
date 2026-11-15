@@ -387,6 +387,14 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
       `scripts/test-hooks.sh`, run by `just check`). Two review rounds; known limit: a
       determined adversary with arbitrary shell can always find a path the prefix rules miss.
   - **Dependency notes** (ignored/deferred updates: what, why, when to retry): none yet.
+- [x] **Release docs + changelog rule** (human request, 2026-11-15: "couldn't find any docs on
+      this"; "make sure Unreleased is consistently updated and maintained for every new PR").
+      Acceptance: one release guide a human finds from docs/README.md; AGENTS.md, CONTRIBUTING
+      and the PR template require an *Unreleased* line for every user-visible change; the
+      `release` skill follows the guide. Done: docs/dev/RELEASING.md.
+  - [ ] Follow-up (review finding, not done): a mechanical check in `just ci` that warns when
+        `main...HEAD` has `feat`/`fix` commits but no CHANGELOG.md change (opt-out trailer for
+        internal fixes). Prose + checkbox only for now.
 - [ ] **De-uhm (filled pauses: "uhm", "eh", Swedish "öh")** — low priority (human, 2026-11-13).
       Real time can't remove time, so the module *ducks* fillers (e.g. −12…−20 dB with soft
       fades) rather than cutting them. Needs an ML detector (voiced, speech-like) → M7/M8 after

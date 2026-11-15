@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 hearo-dsp.workspace = true
 hound.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]

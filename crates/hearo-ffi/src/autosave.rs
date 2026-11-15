@@ -150,6 +150,7 @@ impl Inner {
             modules: self.modules.keys.clone(),
             source: "app-auto".into(),
             output_device: self.engine().map(|e| e.info().output.name.clone()).unwrap_or_default(),
+            settings: Some(self.modules.live_settings()),
             ..Context::default()
         };
         Some(Job { left, right, sample_rate: sr, catches: clip.proposals(sr), ctx })

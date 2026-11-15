@@ -217,6 +217,23 @@ impl ModuleState {
         }
     }
 
+    /// The same settings for a snapshot sidecar (`hearo dataset eval` replays them).
+    pub fn live_settings(&self) -> hearo_engine::snapshots::LiveSettings {
+        use hearo_engine::snapshots::{LiveModule, LiveParam, LiveSettings};
+        LiveSettings {
+            modules: self
+                .settings()
+                .modules
+                .into_iter()
+                .map(|m| LiveModule {
+                    key: m.key,
+                    enabled: m.enabled,
+                    params: m.params.into_iter().map(|p| LiveParam { key: p.key, value: p.value }).collect(),
+                })
+                .collect(),
+        }
+    }
+
     /// Replace everything with `s` (unknown keys ignored; missing modules/params → defaults).
     pub fn apply(&mut self, s: &EngineSettings) {
         let fresh = Self::new(self.keys.clone());
@@ -308,6 +325,21 @@ mod tests {
         assert_eq!(desmack.primary_param.as_deref(), Some("range"));
         let mains = &cat[0].params[0];
         assert_eq!(mains.choices.iter().map(|c| c.label.as_str()).collect::<Vec<_>>(), ["Auto", "50 Hz", "60 Hz"]);
+    }
+
+    #[test]
+    fn live_settings_match_the_settings_file_shape() {
+        let mut st = ModuleState::new(user_module_keys());
+        st.set_param("desmack", "below_speech", 18.0);
+        st.set_enabled("dehum", false);
+        let live = st.live_settings();
+        assert!(!live.is_enabled("dehum") && live.is_enabled("desmack"));
+        assert_eq!(live.param("desmack", "below_speech"), Some(18.0));
+        // A sidecar's `settings` reads back as the app's settings file and vice versa.
+        let json = serde_json::to_string(&live).unwrap();
+        assert_eq!(settings_from_json(json).unwrap(), st.settings());
+        let side = serde_json::json!({ "settings": serde_json::from_str::<serde_json::Value>(&settings_to_json(st.settings())).unwrap() });
+        assert_eq!(hearo_engine::snapshots::LiveSettings::from_sidecar(&side), Some(live));
     }
 
     #[test]

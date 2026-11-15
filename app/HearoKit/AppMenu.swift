@@ -107,9 +107,12 @@ public struct AppMenu {
             case .divider: Divider()
             case .launchAtLogin(let on):
                 Toggle(item.title, isOn: Binding(get: { on }, set: { _ in perform(item) }))
-            case .quit: Button(item.title) { perform(item) }.keyboardShortcut("q")
-            case .settings: Button(item.title) { perform(item) }.keyboardShortcut(",")
-            default: Button(item.title) { perform(item) }
+            default:
+                if let key = item.keyEquivalent.first {
+                    Button(item.title) { perform(item) }.keyboardShortcut(KeyEquivalent(key))
+                } else {
+                    Button(item.title) { perform(item) }
+                }
             }
         }
     }

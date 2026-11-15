@@ -47,7 +47,7 @@ something that looks native. Also the popover as a view there to keep it open �
 validation and testing."
 
 - One `Window("hEARo", id: "main")` (`HearoKit/MainWindow.swift`) replaces the separate
-  Review snapshots and Advanced Settings windows (the latter's entries are now "Settings…"). Tabs **Controls · Review · Settings** as a
+  Review snapshots and Advanced Settings windows. Tabs **Controls · Review · Settings** as a
   segmented control in the toolbar (the Activity Monitor pattern; a sidebar would sit next to
   Review's own clip list), **⌘1–⌘3** switch (View menu, see *Dock icon while the window is
   open*; the picker's tooltip lists them). The title
@@ -364,8 +364,8 @@ settings to see how the audio is with/without (so have the bypass also)."
   The window's minimum width grows to 1100 pt while it is shown. Contents, top down:
   **Bypass** switch ("Hearing the original" / "Hearing the processed clip"), render status
   ("Rendering…", "Rendered in 42 ms · 11 events", or the error), **Use my live settings** and
-  **Apply these to live** (disabled while identical), then every module as in the Advanced
-  settings window — swatch, on/off, every parameter, Reset — in a compact layout (name above
+  **Apply these to live** (disabled while identical), then every module as in the
+  Settings tab — swatch, on/off, every parameter, Reset — in a compact layout (name above
   a full-width slider).
 - **Trial settings:** the panel works on a copy that starts from the live settings (and is
   refreshed from live when the window opens, unless you were mid-experiment). Edits never

@@ -177,7 +177,7 @@ extension ControlsView {
         .menuStyle(.borderlessButton)
         .fixedSize()
         .accessibilityLabel("More")
-        .help("Window, review, export/import snapshots, quit (also on right-click of the menu bar icon)")
+        .help("Window, review, settings, export/import snapshots, quit (also on right-click of the menu bar icon)")
     }
 }
 

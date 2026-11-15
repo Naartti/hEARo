@@ -87,7 +87,7 @@ public struct MainWindowCommands: Commands {
 
     /// Settings… (app menu), then the View menu's tabs in toolbar order.
     static let items: [Item] =
-        [Item(title: "Settings…", tab: .settings, shortcut: ",")]
+        [Item(title: AppMenu.Item.settings.title, tab: .settings, shortcut: ",")]
         + MainTab.allCases.map { Item(title: $0.title, tab: $0, shortcut: $0.shortcut) }
 
     let model: AppModel

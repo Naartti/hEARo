@@ -52,7 +52,8 @@ All six conditions must hold (`crates/hearo-dsp/src/modules/desmack.rs`):
    fast, but aspiration or voicing follows within 5–20 ms. (Measured: 10 ms of required quiet
    still dulled 26 % of stops, 20 ms → 2–4 %; [ADR 0011](../adr/0011-desmack-lookahead-and-io-buffer.md).)
 6. **Salient:** loud against the speech and bright. Its 2 ms peak is at most *below speech*
-   (22 dB) under the speech level when it started, and its energy above 1.5 kHz is at most
+   (22 dB) under the speech level when it started (the reference holds while a burst is being
+   judged, so one loud smack can't raise the bar for the next), and its energy above 1.5 kHz is at most
    10 dB below its total energy (≥ 10 % of it is high-frequency). Added after the human reviewed 108 auto-saved catches (2026-11-15) and rejected 92:
    the rejected ones were mostly quiet (median 25 dB under the speech, vs 3 dB for accepted
    smacks) or dull (thumps, breath, low mouth noise). The smacks people find annoying are the
@@ -131,11 +132,30 @@ audio, and attenuating to the room tone sounds natural: the listener hears a sho
 | 2 ms decay envelopes, age limit on the burst only | 0.93–0.95 | 0 | 1 | 13–17 | stops 4 %; real: 14/19 |
 | re-open on ticks + provisional duck (long smacks) | **0.93–0.95** | **0** | **1.5** | **13–17** | stops 4 %; long smacks 0.83–0.97, −21…−23 dB after 8 ms; **real labelled regions ≥ 10 dB: 5/23 → 17/23** (17/34 with the 11 snapshots added later) |
 | salience gate: ≤ 22 dB below speech, HF ≥ 10 % of the energy (2026-11-15) | 0.90–0.95 (unchanged) | **0** | **1.5** | 13–16 (unchanged) | real (`hearo dataset eval`, 111 reviewed clips): false positives 132 → 81, human-rejected spans re-caught 90 → 50, the same 37 of 56 regions found; the gate only ever removes catches (checked catch by catch against the ungated detector). Stricter *below speech*: 18 dB → 66 FPs / 35 found, 15 dB → 53 / 35, 12 dB → 35 / 33 |
+| speech reference held while a burst is judged (2026-11-15) | golden margins identical | 0 | 1.5 | unchanged | real (230 reviewed clips; smacks found of 92 / false positives): 63 / 222 → 63 / 218, human-rejected spans re-caught 177 → 173 |
+| *(not taken)* pause grace 3 → 6 ms, with *below speech* 18 dB | golden margins identical | — | — | — | real, all with the hold: grace 6 + 18 dB → 64 / 206; grace 3/4/5 + 18 dB → 60 / 198, 62 / 202, 63 / 204; grace 6 + 22 dB → 67 / 226. So the grace finds the extra smacks (gradual onsets) and 18 dB cuts the FPs. But stops with a 3–10 ms voice bar before the burst (not in the golden stop generator) are ducked more: 48 kHz 10 → 28 of 178 (3–6 ms bar), 0 → 9 of 176 (6–10 ms) (DSP review). +1 smack picked from ≈ 10 configurations on the same clips isn't worth that; follow-up: widen the grace only for soft lifts, test-first with a voice-bar stop generator |
+| *(not taken)* pause depth 15 → 13 dB | — | — | — | — | real: +4…5 smacks, +11 FPs |
+| *(not taken)* drop a dull burst as soon as it decays (frees the detector ≤ 20 ms early) | — | — | — | — | real: same 63 found, +1 FP; no smack was waiting behind a dull burst |
 | *(rejected)* settling slow tails | 0.93–0.95 | 0 | 1.5 | 13–17 | loud slow-tailed smacks 0/29 → 29/29, but word-final / weak-aspiration stops 12–27 % ducked (released ducks, invisible to the stop test) |
 
 **Real snapshots (19 clips, the human's `§` presses):** a smack is ducked 0.3–2.5 s before the
 press in 14 of 19 clips, by 12–24 dB, almost always exactly one per clip. Synthetic tests are
 proxies — the real clips overruled them once already (the 2/19 row above).
+
+**The `missed` clips of 2026-11-14 afternoon** (the human pressed `§`; live, nothing was
+removed). Of the eight from 12:00–17:02, one holds only a breath and three are caught offline
+by later changes. The four still missed (`HEARO_PROBE_WAV`/`HEARO_PROBE_AT` probe) have three
+causes:
+
+- **Noisy pause (2 clips):** the pause floor is only 12–15 dB under the speech, so its 5 ms
+  level keeps crossing the *pause depth* (15 dB) line and the 8 ms pause never completes. A
+  lower pause depth finds them but costs more false positives than it's worth (13 dB: +4
+  smacks, +11 FPs); the setting is in Settings for noisy sources.
+- **Gradual onset (1 clip):** the smack's low part lifted the 5 ms level out of the pause
+  6 ms before its HF part crossed the threshold, past the 3 ms grace. A 6 ms grace finds it
+  but ducks more voice-bar stops (tuning log above): open, not fixed.
+- **Slow wet tail (1 clip):** still 25 dB above the floor 60 ms after the peak — the known
+  limit below, left to the ML stage (owner's decision H3 a, 2026-11-15).
 
 ## Limits (honest list)
 

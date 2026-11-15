@@ -83,6 +83,9 @@ const RISING_LIN: f32 = 3.981_071_7; // +6 dB
 /// (rejects the spiky last glottal pulses of a syllable fading into a pause).
 const MIN_PAUSE_MS: f32 = 8.0;
 /// A burst within this long after a qualifying pause still counts as "in the pause".
+/// Kept at 3 ms (2026-11-15): 6 ms finds smacks with a gradual onset (+4 of 92 on 230 reviewed
+/// clips) but also ducks stops with a short voice bar before the burst (48 kHz: 6 → 16 %; DSP
+/// review) — deep dive 06, follow-up in PROGRESS.
 const PAUSE_GRACE_MS: f32 = 3.0;
 /// A smack's energy above 1.5 kHz must be at most this many dB below its broadband energy
 /// (bright). Dull bursts in pauses — thumps, breath, low mouth noise — were the human-rejected
@@ -129,6 +132,8 @@ const PARAMS: [ParamDesc; 4] = [
     // positives, 37 smacks found): 22 dB → 81 / 37, 18 → 66 / 35, 15 → 53 / 35, 12 → 35 / 33.
     // 22 dB is the strictest value that still finds every smack the ungated detector found (the
     // human's bar: fewer false positives, at least as many smacks); the gate never adds a catch.
+    // Re-checked 2026-11-15 on 230 reviewed clips with the speech hold (smacks found of 92 /
+    // false positives): 22 dB → 63 / 218, 20 → 62 / 214, 18 → 60 / 198 — still 22.
     // 48 dB ≈ off for any realistic level.
     ParamDesc {
         key: "below_speech",
@@ -334,9 +339,15 @@ impl DeSmack {
         self.e_hf_q += self.a_q * (hf_p - self.e_hf_q);
         let loud = (x.abs() + sd.abs()) * (x.abs() + sd.abs()); // = max(L², R²): depth uses the louder channel
         self.e_bb += self.a_fast * (loud - self.e_bb);
-        self.sp_env += self.a_sp_env * (bb_p - self.sp_env);
-        let a = if self.sp_env > self.speech { self.a_sp_att } else { self.a_sp_rel };
-        self.speech += a * (self.sp_env - self.speech);
+        // The speech reference holds while a burst is being judged: a loud smack mustn't lift it
+        // (≈ 3 dB) and so make the next smack in a cluster look less salient (DSP review
+        // 2026-11-15). A burst that turns out to be speech costs the tracker ≤ 80 ms of attack
+        // (MAX_LEN + 2·QUIET_AFTER; every event leaves Open/Decayed within that).
+        if !self.events.iter().flatten().any(|e| e.phase != Phase::Closed) {
+            self.sp_env += self.a_sp_env * (bb_p - self.sp_env);
+            let a = if self.sp_env > self.speech { self.a_sp_att } else { self.a_sp_rel };
+            self.speech += a * (self.sp_env - self.speech);
+        }
 
         let mut busy = false;
         let (quiet_after, range_db, pre) = (self.quiet_after, self.range_db, self.pre);
@@ -713,6 +724,70 @@ mod tests {
             m.detect(1e30, 1e30);
         }
         assert!(m.speech.is_finite() && m.bg.is_finite() && m.e_hf.is_finite());
+    }
+
+    /// Deterministic white-ish noise (no RNG dependency), ±1.
+    fn noise(i: usize) -> f32 {
+        let x = (i as u32).wrapping_mul(2_654_435_761).rotate_left(13).wrapping_mul(0x9E37_79B9);
+        (x as f32 / u32::MAX as f32) * 2.0 - 1.0
+    }
+
+    /// 1 s of "speech" (noise at `speech_amp`), then a 300 ms pause at −70 dBFS; returns the
+    /// detector and the sample index where the pause ends.
+    fn after_speech_and_pause(sr: f32, speech_amp: f32) -> (DeSmack, usize) {
+        let mut m = DeSmack::new();
+        m.prepare(sr, 512, 1);
+        let speech = sr as usize;
+        let pause = (0.3 * sr) as usize;
+        for i in 0..speech + pause {
+            let a = if i < speech { speech_amp } else { 3e-4 };
+            m.detect(a * noise(i), 0.0);
+        }
+        (m, speech + pause)
+    }
+
+    /// Whether any event got as far as a duck (i.e. was judged a smack).
+    fn ducked(m: &DeSmack) -> bool {
+        m.events.iter().flatten().any(|e| e.duck_from != u64::MAX)
+    }
+
+    /// A loud, bright 10 ms burst (louder than the speech) from `at`, dying away into the pause.
+    fn loud_smack(m: &mut DeSmack, sr: f32, at: usize, tail_s: f32) {
+        let len = (0.010 * sr) as usize;
+        for k in 0..len + (tail_s * sr) as usize {
+            let i = at + k;
+            let a = if k < len { 0.5 * (1.0 - k as f32 / len as f32) } else { 3e-4 };
+            m.detect(a * noise(i) * if i.is_multiple_of(2) { 1.0 } else { -1.0 }, 0.0); // bright: near fs/2
+        }
+    }
+
+    #[test]
+    fn speech_reference_holds_while_a_burst_is_judged() {
+        for sr in [44_100.0, 48_000.0, 96_000.0] {
+            let (mut m, at) = after_speech_and_pause(sr, 0.1);
+            let before = pow_to_db(m.speech);
+            loud_smack(&mut m, sr, at, 0.03);
+            let after = pow_to_db(m.speech);
+            assert!(ducked(&m), "{sr}: the burst is a smack");
+            assert!((after - before).abs() < 0.5, "{sr}: speech reference moved {before:.1} → {after:.1} dB");
+        }
+    }
+
+    #[test]
+    fn speech_reference_follows_speech_again_after_the_burst() {
+        for sr in [44_100.0, 48_000.0, 96_000.0] {
+            let (mut m, at) = after_speech_and_pause(sr, 0.1);
+            loud_smack(&mut m, sr, at, 0.1); // judged and closed within ≤ 80 ms
+            let before = pow_to_db(m.speech);
+            // Then 300 ms of speech 10 dB louder than before: the reference must climb (50 ms
+            // attack), not stay frozen at the pre-burst level.
+            let start = at + ((0.010 + 0.1) * sr) as usize;
+            for i in start..start + (0.3 * sr) as usize {
+                m.detect(0.316 * noise(i), 0.0);
+            }
+            let after = pow_to_db(m.speech);
+            assert!(after > before + 6.0, "{sr}: speech reference stuck: {before:.1} → {after:.1} dB");
+        }
     }
 }
 

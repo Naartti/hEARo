@@ -14,7 +14,7 @@ commit and push, and again in GitHub Actions on every pull request
 
 `just check`: rustfmt, clippy (`-D warnings`), every fast Rust test via nextest (unit,
 property, RT-safety, 10-min stress, CLI end-to-end), Swift build (+ tests with Xcode), ruff +
-pytest (fast), repo hygiene on staged files.
+pytest (fast), repo hygiene on staged files, agent-hook tests (`scripts/test-hooks.sh`).
 
 `just ci` adds: golden audio tests, doc tests, benchmarks compile, CPU budgets (release build), cargo-deny
 (licenses/advisories/sources), cargo-machete (unused deps), XcodeGen spec generation,
@@ -75,6 +75,12 @@ Install with `lefthook install` (bootstrap does it). Don't skip with `--no-verif
 `target/ci/check.ok`. The Claude Code Bash hook (`.claude/hooks/bash-guard.sh`) refuses
 `git commit` when the tree no longer matches, so agents can't commit code the gate never saw.
 Staging doesn't change the fingerprint. Humans aren't affected.
+
+**Agent `gh` scope.** `.claude/settings.json` auto-allows some `gh` commands by prefix, and a
+prefix can't see which repository `--repo`/`-R`, `GH_REPO`, `GH_HOST`, `--hostname` or a PR URL
+selects. The same Bash hook (`.claude/hooks/gh_scope.py`) blocks any `gh` call aimed anywhere
+but `Naartti/hEARo` on github.com; links inside `--body`/`--title` text are fine.
+`gh api` is auto-allowed only under `repos/Naartti/hEARo/`.
 
 ## Other useful targets
 

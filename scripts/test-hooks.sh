@@ -92,6 +92,28 @@ FAKE_PR_AUTHOR=Naartti expect allow 'gh pr checkout 4 && just ci'
 FAKE_PR_AUTHOR=stranger expect ask 'gh pr checkout 9'
 FAKE_PR_AUTHOR='' expect ask 'gh pr checkout 9'
 
+# The commit gate reads the green-check fingerprint of the checkout the commit happens in (a
+# worktree has its own target/ci/check.ok), not CLAUDE_PROJECT_DIR's (2026-11-15: a worktree
+# agent's green commit was judged by the main checkout's tree and blocked); `git -C <dir>
+# commit` and `cd <dir> && git commit` are gated too (`-C` used to slip past the pattern).
+wt="$(mktemp -d)"
+git -C "$wt" init -q
+mkdir -p "$wt/scripts" "$wt/target/ci"
+cp "$root/scripts/tree-fingerprint.sh" "$wt/scripts/"
+printf 'target/\n' >"$wt/.gitignore"
+"$wt/scripts/tree-fingerprint.sh" >"$wt/target/ci/check.ok"
+CWD="$wt" expect allow 'git commit -m "feat: x"'
+expect allow "git -C $wt commit -m x"
+expect allow "cd $wt && git commit -m x"
+echo change >"$wt/new.txt"
+CWD="$wt" expect block 'git commit -m "feat: x"'
+expect block "git -C $wt commit -m x"
+expect block "git -C '$wt' commit -m x"
+expect block "cd $wt && git commit -m x"
+CWD="$wt" expect block 'git -C . commit -am x'
+CWD="$wt" expect allow 'git commit-tree HEAD^{tree} -m x'
+rm -rf "$wt"
+
 # Existing rules still hold.
 expect block 'git commit --no-verify -m x'
 expect block 'git push --force origin main'

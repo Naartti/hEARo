@@ -177,7 +177,7 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
         reviewed snapshots, cut false positives substantially without losing real smacks, keep
         every golden test. Done: `hearo dataset eval` (scores against all reviewed clips;
         reproduces 85/92 live rejections offline) and a salience gate — ≤ *below speech*
-        (`loudness`, new param, 18 dB) under the speech level and ≥ −8 dB HF share. FPs 126 →
+        (`loudness`, new param, 18 dB) under the speech level and ≥ 16 % of its energy above 1.5 kHz. FPs 126 →
         60, rejected re-caught 85 → 35, regions found 37 → 34 / 56. Deep dive 06 tuning log.
     - [ ] Human: re-listen; if still too eager, try *Below speech* 12–15 dB in Settings
           (12 dB → 32 FPs, 33 found). Remaining FPs: next look at the 19 missed regions + the

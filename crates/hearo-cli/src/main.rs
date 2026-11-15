@@ -9,6 +9,7 @@ use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
 
 mod dataset;
+mod eval;
 mod gen_signals;
 mod hotkey;
 mod inspect;

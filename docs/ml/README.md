@@ -40,6 +40,9 @@ a verified smack) and **X** marks it a false positive (the sidecar's `rejected` 
   keep the **test set** to hotkey clips you marked yourself.
 - Untouched auto clips are deleted after the retention set in Settings (default 31 days);
   anything you reviewed or edited stays. `hearo dataset propose` skips auto clips.
+- `hearo dataset eval` scores de-smack (or `--module` another detector) against every reviewed
+  clip: regions found, false positives, and how many land on rejected spans. It's how DSP
+  changes are judged on real audio; clips never leave the Mac, so it isn't a CI test.
 
 ### Using it
 

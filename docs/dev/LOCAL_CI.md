@@ -53,7 +53,8 @@ file. It fails where Codecov's `codecov/patch` would (below project coverage −
 
 ## Releasing
 
-Bump the version (the `release` skill has the checklist), merge to `main`, wait for CI on
+The step-by-step guide, including how CHANGELOG.md's *Unreleased* section is kept current, is
+[RELEASING.md](RELEASING.md). In short: bump the version, merge to `main`, wait for CI on
 `main` to go green, then tag: `git tag v0.2.0 && git push origin v0.2.0`. `release.yml`'s
 read-only **build** job refuses a tag that doesn't match `Cargo.toml`, isn't on `main` or has no
 successful CI run, then builds with `scripts/build-app.sh release`, signs **ad-hoc**

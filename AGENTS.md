@@ -48,6 +48,10 @@ This is the default workflow for every request; the human never has to restate i
 4. **Branch.** `git switch -c <type>/<slug>` from `main` (type = Conventional Commits type).
 5. **Test first, commit as you go.** Failing test → code → `just check` → commit. One logical
    change per commit, every commit green, docs in the same commit, body says *why*.
+   A change a user would notice (app, engine behaviour, DSP results, CLI, install, a
+   user-facing dependency fix) also adds a line under *Unreleased* in CHANGELOG.md in that
+   commit, written for the user, not as a commit subject. Refactors, tests, CI, tooling and
+   agent docs need none. What counts: docs/dev/RELEASING.md.
    Every new code path gets a test, CLI and tooling too: keep I/O at a thin edge (take a
    directory or a writer as an argument, so a test can pass a temp dir or a buffer) and test
    the logic end to end. Before pushing, `just patch-coverage` must pass — a red
@@ -58,7 +62,8 @@ This is the default workflow for every request; the human never has to restate i
    commit per fix, or note in PROGRESS.md why one was rejected.
 7. **Verify for real.** `just ci` green. UI changes: `just app` builds and launches; check what
    you can, then write a short *How to verify* checklist for the human.
-8. **Finish.** Tick PROGRESS.md (in the branch), `git push -u origin <branch>` (pre-push runs
+8. **Finish.** Check `git diff main...HEAD -- CHANGELOG.md`: every user-visible `feat`/`fix`
+   on the branch has its *Unreleased* line. Tick PROGRESS.md (in the branch), `git push -u origin <branch>` (pre-push runs
    `just ci`), open a PR with `gh pr create` filled from `.github/PULL_REQUEST_TEMPLATE.md`
    (body ends with the How to verify checklist), and wait for `gh pr checks --watch` to go
    green; a red hosted run is fixed like a red local one. The human merges (rebase merge on
@@ -117,7 +122,8 @@ docs/                doc-as-code; deep-dives/ explain everything
   allocations with `hearo_testkit::rt::count_allocs` (ADR 0007) and must see zero.
 - Global bypass is bit-exact passthrough. Never leave the user in silence; fail to passthrough.
 - Test first. Never weaken or delete a test to get green. Golden updates need a reason in the commit.
-- Docs change in the same commit as the code they describe.
+- Docs change in the same commit as the code they describe; user-visible changes get a
+  CHANGELOG.md *Unreleased* line in the same commit too.
 - Conventional Commits, one logical change each. Update docs/PROGRESS.md after each task.
 - Verify crate/tool versions and APIs before using them; pin exact versions.
 - No network code, telemetry, secrets, audio recordings or large binaries in git.

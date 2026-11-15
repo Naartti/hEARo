@@ -1,0 +1,70 @@
+# Releasing
+
+How to keep the changelog current and how to publish a new version of hEARo. Public releases
+are built by GitHub Actions ([`release.yml`](../../.github/workflows/release.yml),
+[ADR 0016](../adr/0016-github-actions-ci-and-releases.md)) from a `v<version>` tag. They are
+ad-hoc signed and not notarized, and ship as a DMG with a `.sha256` file and a build-provenance
+attestation. Nothing is built on your Mac for a public release.
+
+## Between releases: keep *Unreleased* current
+
+[CHANGELOG.md](../../CHANGELOG.md) follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Every PR with a change a user would notice adds a line under `## Unreleased`, in the same commit
+as the change. Use the heading that fits: *Added*, *Changed*, *Deprecated*, *Removed*, *Fixed*
+or *Security*.
+
+- **Needs an entry:** anything in the app, the engine's behaviour, DSP results, the `hearo` CLI
+  and dataset format, install steps, and dependency bumps that fix a user-facing bug or
+  security advisory.
+- **No entry:** refactors with no visible effect, tests, CI and tooling, agent instructions,
+  and internal docs.
+- **How to write it:** one line per change, written for the user ("De-smack leaves quiet and
+  dull bursts alone"), not as a commit subject. Merge lines that describe the same thing, and
+  fix an entry in place if a later PR changes it before the release ships.
+
+At release time *Unreleased* should already be complete. The release PR only renames it.
+
+## Cut a release
+
+1. **Check *Unreleased* against the history.** `git log --oneline v<last>..main` lists every
+   commit since the last tag. Every `feat` and every user-visible `fix` should have a line.
+   Add any that are missing. Merged Dependabot PRs touch only manifests and lockfiles
+   ([ADR 0019](../adr/0019-dependency-update-routine.md)), so a security fix among them gets
+   its *Security* line here.
+2. **Bump the version on a branch** (`chore/release-v<version>`). Change `version` in
+   [Cargo.toml](../../Cargo.toml) (the workspace version, which the app bundle also uses) and
+   [ml/pyproject.toml](../../ml/pyproject.toml), then run `(cd ml && uv lock)`; `just check`
+   updates `Cargo.lock` but runs uv with `--frozen`, which doesn't. In CHANGELOG.md, rename `## Unreleased` to
+   `## [<version>] - <YYYY-MM-DD>`, add an empty `## Unreleased` above it, and update the
+   version stated in the intro. Commit `chore(release): v<version>`, open a PR, wait for
+   green checks, and merge it.
+3. **Optional dry run.** `gh workflow run release.yml --ref main` builds without publishing.
+   Download the artifact and check it as in step 5.
+4. **Tag.** Wait until CI on the merged `main` commit is green, then
+   `git switch main && git pull --ff-only && git tag v<version> && git push origin v<version>`,
+   and follow the run with `gh run watch`. The workflow refuses a tag that doesn't match
+   `Cargo.toml`, isn't on `main`, or has no successful CI run. A version with a pre-release
+   suffix (`0.2.0-rc.1`) becomes a GitHub pre-release and never "latest".
+5. **Verify the published DMG** on a Mac:
+
+   ```sh
+   gh release download v<version> --pattern 'hEARo-*'
+   shasum -a 256 -c hEARo-<version>.dmg.sha256
+   gh attestation verify hEARo-<version>.dmg --repo Naartti/hEARo
+   ```
+
+   Mount it: the volume is "hEARo" with the icon, the app, an Applications link and the
+   read-me. `codesign -dv` on the app shows `Signature=adhoc` and no Authority line (no
+   personal certificate). Install it as described in [user/INSTALL.md](../user/INSTALL.md).
+   About hEARo shows the new version without "· debug".
+
+## Local builds are not releases
+
+`just release` builds a DMG in `dist/` signed with your personal identity from `.env.local`
+([SIGNING.md](SIGNING.md)). That certificate carries your name, so **never upload it**. It is
+for your own Macs; `just install` installs it as the Mac's one copy at
+`~/Applications/hEARo.app`.
+
+Notarized releases need a paid Developer ID (H5 in [OPEN_QUESTIONS.md](../OPEN_QUESTIONS.md)).
+Until then, users allow the app once per version via System Settings → Privacy & Security →
+Open Anyway.

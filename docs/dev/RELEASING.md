@@ -26,18 +26,20 @@ At release time *Unreleased* should already be complete. The release PR only ren
 
 ## Cut a release
 
-1. **Check *Unreleased* against the history.** `git log --oneline v<last>..main` lists every
-   commit since the last tag. Every `feat` and every user-visible `fix` should have a line.
+1. **Check *Unreleased* against the history.** `git fetch --tags origin`, then
+   `git log --oneline v<last>..origin/main` lists every commit since the last tag. Every `feat` and every user-visible `fix` should have a line.
    Add any that are missing. Merged Dependabot PRs touch only manifests and lockfiles
    ([ADR 0019](../adr/0019-dependency-update-routine.md)), so a security fix among them gets
    its *Security* line here.
-2. **Bump the version on a branch** (`chore/release-v<version>`). Change `version` in
+2. **Bump the version on a branch** (`chore/release-v<version>`). Before 1.0, new features
+   bump the minor version (0.1.0 → 0.2.0) and fixes alone bump the patch (0.2.0 → 0.2.1);
+   from 1.0 on, [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Change `version` in
    [Cargo.toml](../../Cargo.toml) (the workspace version, which the app bundle also uses) and
    [ml/pyproject.toml](../../ml/pyproject.toml), then run `(cd ml && uv lock)`; `just check`
    updates `Cargo.lock` but runs uv with `--frozen`, which doesn't. In CHANGELOG.md, rename `## Unreleased` to
-   `## [<version>] - <YYYY-MM-DD>`, add an empty `## Unreleased` above it, and update the
-   version stated in the intro. Commit `chore(release): v<version>`, open a PR, wait for
-   green checks, and merge it.
+   `## [<version>] - <YYYY-MM-DD>` and add an empty `## Unreleased` above it. Commit
+   `chore(release): v<version>`, open a PR and wait for green checks; the maintainer merges
+   it.
 3. **Optional dry run.** `gh workflow run release.yml --ref main` builds without publishing.
    Download the artifact and check it as in step 5.
 4. **Tag.** Wait until CI on the merged `main` commit is green, then

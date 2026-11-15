@@ -2,8 +2,7 @@
 
 All notable changes to hEARo are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html) from 1.0 on. The workspace version
-is 0.1.0. Every user-visible change adds a line under *Unreleased* in the same pull request;
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html) from 1.0 on. Every user-visible change adds a line under *Unreleased* in the same pull request;
 a release renames that section ([docs/dev/RELEASING.md](docs/dev/RELEASING.md)).
 
 ## Unreleased

@@ -14,10 +14,9 @@ it; this skill only adds what is specific to an agent doing it.
    entry means a PR skipped the AGENTS.md step 5 rule. Note it in the report, don't just
    paper over it.
 2. **Release PR.** On `chore/release-v<version>`: bump `Cargo.toml` + `ml/pyproject.toml`,
-   `(cd ml && uv lock)`, rename *Unreleased*, add a fresh empty one, update the version in
-   the intro, `just ci`, commit `chore(release): v<version>`, PR with the full template body.
-   The human merges. Pick the version yourself (pre-1.0: a minor bump for new features, a
-   patch bump for fixes only) and say why in the PR.
+   `(cd ml && uv lock)`, rename *Unreleased*, add a fresh empty one, `just ci`, commit
+   `chore(release): v<version>`, PR with the full template body. The human merges. Pick the
+   version by RELEASING.md's rule and say why in the PR.
 3. **Ask the human before tagging.** A pushed tag publishes a public release. Only tag when
    they say so, and only after CI on the merged `main` commit is green; then watch with
    `gh run watch` and verify the published DMG (RELEASING.md step 5).

@@ -428,6 +428,13 @@ See docs/HANDOVER.md §14; tasks get broken out here when the milestone starts.
 
 ## Log
 
+- 2026-11-15 — release docs + changelog rule (human: "couldn't find any docs on this"; "make
+  sure Unreleased is consistently maintained for every new PR"). docs/dev/RELEASING.md is the
+  one release guide (linked from docs/README.md, LOCAL_CI.md, CONTRIBUTING.md; the `release`
+  skill now points to it). AGENTS.md step 5/8 + rules, PR template and CONTRIBUTING require an
+  *Unreleased* line for user-visible changes. Found while preparing 0.2.0: *Unreleased* had 2
+  of ~6 user-visible changes since v0.1.0.
+
 - 2026-11-15 — `codecov.yml`: project status tolerates a 1 % drop (patch 5 %). Human: a docs-only
   PR (#5) failed `codecov/project` at -0.02 %; the default is zero tolerance, which is noise.
 - 2026-11-15 — de-flaked `staleRenderResultIsDropped` / `onlyOneRenderRunsAtATime` (failed on a

@@ -5,25 +5,21 @@ description: Steps for cutting a hEARo release - version bump, changelog, tag, t
 
 # Release
 
-Public releases are built by GitHub Actions (`.github/workflows/release.yml`, ADR 0016) from a
-`v<version>` tag: ad-hoc signed, not notarized, DMG + `.sha256` + provenance attestation.
+The procedure lives in docs/dev/RELEASING.md (written for the human too). Read it and follow
+it; this skill only adds what is specific to an agent doing it.
 
-1. On a branch: bump `version` in `Cargo.toml` (workspace) and `ml/pyproject.toml`; move
-   CHANGELOG.md's *Unreleased* items under `## [<version>] - <date>`. Commit
-   `chore(release): v<version>`, open a PR, wait for green checks; the human merges.
-2. Optional dry run: `gh workflow run release.yml --ref main`, then download the artifact and
-   check it (step 4).
-3. **Ask the human before tagging** — a pushed tag publishes a release. Wait until CI on the
-   merged `main` commit is green (the workflow refuses tags without a green CI run or off
-   `main`), then `git tag v<version> && git push origin v<version>`; watch with `gh run watch`.
-   A `-rc.N` suffix publishes a pre-release that never becomes "latest".
-4. Verify the published DMG on this Mac: `shasum -a 256 -c`, `gh attestation verify <dmg> --repo
-   Naartti/hEARo`, `codesign -dv` shows `Signature=adhoc` and no Authority line (no personal
-   certificate), mount it (volume "hEARo" with the icon, app + Applications link + read-me),
-   About hEARo shows the new version without "· debug". Install follows docs/user/INSTALL.md.
-5. Never upload a locally built DMG: `just release` signs with the personal identity from
-   `.env.local` (the certificate carries the owner's name). It's for the owner's own Macs;
-   `just install` installs it as this Mac's one copy at `~/Applications/hEARo.app`.
-
-Notarized releases need a paid Developer ID (H5 in docs/OPEN_QUESTIONS.md); until then
-users allow the app once via System Settings → Privacy & Security → Open Anyway.
+1. **Changelog first.** Compare `git log --oneline v<last>..main` with *Unreleased* in
+   CHANGELOG.md. Add a user-facing line for every `feat` and user-visible `fix` that lacks one
+   (read the commit or PR to word it for a user; merge lines about the same thing). A missing
+   entry means a PR skipped the AGENTS.md step 5 rule. Note it in the report, don't just
+   paper over it.
+2. **Release PR.** On `chore/release-v<version>`: bump `Cargo.toml` + `ml/pyproject.toml`,
+   `(cd ml && uv lock)`, rename *Unreleased*, add a fresh empty one, update the version in
+   the intro, `just ci`, commit `chore(release): v<version>`, PR with the full template body.
+   The human merges. Pick the version yourself (pre-1.0: a minor bump for new features, a
+   patch bump for fixes only) and say why in the PR.
+3. **Ask the human before tagging.** A pushed tag publishes a public release. Only tag when
+   they say so, and only after CI on the merged `main` commit is green; then watch with
+   `gh run watch` and verify the published DMG (RELEASING.md step 5).
+4. **Never upload a locally built DMG.** `just release` signs with the owner's personal
+   certificate, which carries their name.

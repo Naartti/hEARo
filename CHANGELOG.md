@@ -15,8 +15,8 @@ is 0.1.0.
 ### Changed
 
 - De-smack leaves quiet and dull bursts alone: a smack must peak within *Below speech* (new
-  setting, 18 dB) of the speech level and have ≥ 16 % of its energy above 1.5 kHz. On 106 reviewed clips this
-  halves the false positives (126 → 60) for 3 of 37 smacks.
+  setting, 18 dB) of the speech level and have ≥ 10 % of its energy above 1.5 kHz. On 106 reviewed clips this
+  halves the false positives (126 → 60) for 2 of 37 smacks.
 
 ## [0.1.0] - 2026-11-15
 

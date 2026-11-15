@@ -10,7 +10,7 @@ use std::ptr::NonNull;
 use std::sync::Arc;
 use std::time::Instant;
 
-use hearo_dsp::{AudioBlock, Chain};
+use hearo_dsp::{AudioBlock, Chain, ModuleId};
 use objc2_core_audio::AudioObjectID;
 use objc2_core_audio_types::{AudioBuffer, AudioBufferList, AudioTimeStamp};
 
@@ -29,6 +29,10 @@ pub(crate) struct RtState {
     waveform: Option<(Arc<WaveformRing>, ColumnBuilder)>,
     /// Where the chain's detection events go (auto-saving de-smack catches, ADR 0018).
     events: Option<Arc<EventRing>>,
+    /// The chain's trigger counts at the last cycle, per `ModuleId::index`.
+    seen_triggers: [u64; ModuleId::COUNT],
+    /// Triggers published to `stats`: those not under global bypass (popover count, glow).
+    published_triggers: [u64; ModuleId::COUNT],
     applied_bypass: bool,
     applied_enabled: [bool; MAX_SLOTS],
     applied_gen: u32,
@@ -51,7 +55,10 @@ impl RtState {
         capture: Option<Arc<CaptureRing>>,
     ) -> Self {
         let applied_enabled = std::array::from_fn(|i| i < chain.len() && chain.is_enabled(i));
+        let seen_triggers = std::array::from_fn(|i| chain.telemetry().meters(ModuleId::ALL[i]).triggers);
         Self {
+            seen_triggers,
+            published_triggers: [0; ModuleId::COUNT],
             applied_bypass: chain.is_bypassed(),
             chain,
             planar: vec![0.0; 2 * max_frames],
@@ -163,17 +170,26 @@ impl RtState {
             offset += n;
         }
         // Events (with chain-input sample positions = capture-ring frames) to the control thread.
-        // Under global bypass nothing was removed from what plays, so there is nothing to report.
+        // Under global bypass nothing was removed from what plays, so there is nothing to report:
+        // no events, no triggers (the popover count and the menu bar glow), no reduction.
+        let bypassed = self.chain.is_bypassed();
         if let Some(ring) = &self.events
-            && !self.chain.is_bypassed()
+            && !bypassed
         {
             ring.push_all(self.chain.telemetry().events());
         }
         self.chain.telemetry_mut().clear_events();
         self.stats.set_faults(self.chain.faults());
-        for id in hearo_dsp::ModuleId::ALL {
+        for id in ModuleId::ALL {
             let m = self.chain.telemetry().meters(id);
-            self.stats.set_module(id, m.triggers, m.gain_reduction_db);
+            let i = id.index();
+            let new = m.triggers.saturating_sub(self.seen_triggers[i]);
+            self.seen_triggers[i] = m.triggers;
+            if !bypassed {
+                self.published_triggers[i] += new;
+            }
+            let gr = if bypassed { 0.0 } else { m.gain_reduction_db };
+            self.stats.set_module(id, self.published_triggers[i], gr);
         }
 
         let cycle = start.elapsed().as_nanos().min(u32::MAX as u128) as u32;
@@ -559,6 +575,58 @@ mod tests {
             "event positions off the smacks: {:?}",
             got.iter().map(|e| e.start_sample).collect::<Vec<_>>()
         );
+    }
+
+    /// Reports one de-smack event and 9 dB of reduction per block.
+    struct Ticker;
+    impl Module for Ticker {
+        fn id(&self) -> ModuleId {
+            ModuleId::DeSmack
+        }
+        fn prepare(&mut self, _: f32, _: usize, _: usize) {}
+        fn reset(&mut self) {}
+        fn process(&mut self, b: &mut AudioBlock<'_>, t: &mut TelemetryWriter) {
+            t.push_event(hearo_dsp::Event {
+                module: ModuleId::DeSmack,
+                kind: hearo_dsp::EventKind::Smack,
+                start_sample: t.block_start(),
+                duration_samples: b.frames() as u32,
+                energy_removed_db: 9.0,
+            });
+            t.set_gain_reduction(ModuleId::DeSmack, 9.0);
+        }
+    }
+
+    /// The popover count and the `.removing` glow come from the published trigger count: under
+    /// global bypass nothing is removed from what plays, so it doesn't move and the reduction
+    /// reads 0 (RT review 2026-11-14). Afterwards it counts exactly the published events.
+    #[test]
+    fn bypass_freezes_trigger_counts_and_reduction() {
+        let events = Arc::new(EventRing::new(64));
+        let mut st = state(vec![Box::new(Ticker)], 512).with_events(events.clone());
+        let mut tap = vec![0.1f32; 2 * 512];
+        let mut out = vec![0.0f32; 2 * 512];
+        let mut inp = FakeList::new(&mut [(2, Some(&mut tap))]);
+        let mut outp = FakeList::new(&mut [(2, Some(&mut out))]);
+        let mut got = Vec::with_capacity(64);
+        st.process(Some(inp.list()), outp.list());
+        assert_eq!(st.stats.module(ModuleId::DeSmack), (1, 9.0));
+        events.drain(&mut got);
+        st.controls.set_bypass(true);
+        let (_, allocs) = count_allocs(|| {
+            for _ in 0..5 {
+                st.process(Some(inp.list()), outp.list());
+            }
+        });
+        assert_eq!(allocs, 0);
+        assert_eq!(st.stats.module(ModuleId::DeSmack), (1, 0.0), "counted while bypassed");
+        st.controls.set_bypass(false);
+        for _ in 0..3 {
+            st.process(Some(inp.list()), outp.list());
+        }
+        events.drain(&mut got);
+        assert_eq!(got.len(), 4, "one before bypass, three after");
+        assert_eq!(st.stats.module(ModuleId::DeSmack), (4, 9.0), "trigger count = published events");
     }
 
     struct Panicky;

@@ -55,6 +55,9 @@ struct Slot {
     module: Box<dyn Module>,
     state: SlotState,
     dry: MultiDelay,
+    /// The module's latency (set by `prepare`): audio reaching it at chain time `t` leaves the
+    /// slot at `t + latency`.
+    latency: usize,
 }
 
 /// The ordered processing chain. Owned by the audio thread once prepared.
@@ -94,7 +97,7 @@ impl Chain {
     pub fn new(modules: Vec<Box<dyn Module>>) -> Self {
         let slots = modules
             .into_iter()
-            .map(|module| Slot { module, state: SlotState::On, dry: MultiDelay::default() })
+            .map(|module| Slot { module, state: SlotState::On, dry: MultiDelay::default(), latency: 0 })
             .collect();
         Self {
             slots,
@@ -128,6 +131,7 @@ impl Chain {
             slot.module.reset();
             let l = slot.module.latency_samples();
             slot.dry.prepare(channels, l);
+            slot.latency = l;
             slot.state = if slot.state.target_on() { SlotState::On } else { SlotState::Off };
             total += l;
         }
@@ -287,6 +291,7 @@ impl Chain {
             dry.copy_from(block);
             slot.dry.process(&mut dry);
             let was_active = slot.state != SlotState::Off;
+            let mark = self.telemetry.event_count();
             match slot.state {
                 SlotState::Off => {
                     block.copy_from(&dry);
@@ -297,8 +302,14 @@ impl Chain {
                 SlotState::WarmingUp { remaining } => {
                     slot.module.process(block, &mut self.telemetry);
                     block.copy_from(&dry);
-                    // Output is still dry: nothing was removed yet.
+                    // Output is still dry: nothing was removed yet. Events are for audio that
+                    // leaves `latency` later; keep those that leave once the fade-in can start
+                    // (at a chunk boundary: this whole chunk is dry).
                     self.telemetry.set_gain_reduction(slot.module.id(), 0.0);
+                    let (exit, wet_from) = (slot.latency as u64, self.sample_pos + remaining.max(n) as u64);
+                    self.telemetry.retain_events_since(mark, |e| {
+                        e.start_sample.saturating_add(e.duration_samples as u64 + exit) > wet_from
+                    });
                     slot.state = if remaining <= n {
                         SlotState::FadingIn { pos: 0 }
                     } else {
@@ -313,6 +324,10 @@ impl Chain {
                 SlotState::FadingOut { pos } => {
                     slot.module.process(block, &mut self.telemetry);
                     crossfade(block, &dry, |i| 1.0 - fade_gain(pos + i, fade));
+                    // Audio leaving after the fade ends plays dry: its events report nothing
+                    // removed (a lookahead module still detects while fading out).
+                    let (exit, dry_from) = (slot.latency as u64, self.sample_pos + fade.saturating_sub(pos) as u64);
+                    self.telemetry.retain_events_since(mark, |e| e.start_sample.saturating_add(exit) < dry_from);
                     slot.state = if pos + n >= fade { SlotState::Off } else { SlotState::FadingOut { pos: pos + n } };
                 }
             }
@@ -321,6 +336,8 @@ impl Chain {
                 self.faults += 1;
                 block.copy_from(&dry);
                 slot.module.reset();
+                // Its events this block removed nothing (and the reset emptied its lookahead).
+                self.telemetry.retain_events_since(mark, |_| false);
                 // Re-enter through warm-up + fade so a lookahead module never outputs its
                 // emptied buffer (no dropout, no click).
                 slot.state = if slot.state.target_on() {
@@ -529,6 +546,132 @@ mod tests {
         let _ = run(&mut c, &[0.1; 1024], 64);
         assert_eq!(c.slot_state(0), Some(SlotState::Off));
         assert_eq!(c.telemetry().meters(ModuleId::DeSmack).gain_reduction_db, 0.0, "stale meter after disabling");
+    }
+
+    /// Delays by `latency` and reports one event per block, for the block's audio shifted back
+    /// by `back` samples: `back = 0` is a lookahead detector (the audio entering now, which
+    /// leaves `latency` later); `back = latency` reports the audio leaving now.
+    struct Reporter {
+        inner: Lookahead,
+        back: u64,
+    }
+    impl Reporter {
+        fn new(latency: usize, back: u64) -> Self {
+            Self { inner: Lookahead::new(latency, 0.0), back }
+        }
+    }
+    impl Module for Reporter {
+        fn id(&self) -> ModuleId {
+            ModuleId::DeSmack
+        }
+        fn prepare(&mut self, sr: f32, max_block: usize, ch: usize) {
+            self.inner.prepare(sr, max_block, ch);
+        }
+        fn reset(&mut self) {
+            self.inner.reset();
+        }
+        fn latency_samples(&self) -> usize {
+            self.inner.latency_samples()
+        }
+        fn process(&mut self, block: &mut AudioBlock<'_>, t: &mut TelemetryWriter) {
+            self.inner.process(block, t);
+            t.push_event(crate::Event {
+                module: ModuleId::DeSmack,
+                kind: crate::EventKind::Smack,
+                start_sample: t.block_start().saturating_sub(self.back),
+                duration_samples: block.frames() as u32,
+                energy_removed_db: 6.0,
+            });
+        }
+    }
+
+    /// Run `frames` of silence in 64-frame blocks; (events reported, triggers counted) meanwhile.
+    fn run_counting(c: &mut Chain, frames: usize) -> (usize, u64) {
+        let before = c.telemetry().meters(ModuleId::DeSmack).triggers;
+        let mut events = 0;
+        for _ in 0..frames / 64 {
+            let mut data = [0.0f32; 64];
+            c.process(&mut AudioBlock::from_planar(&mut data, 1));
+            events += c.telemetry().events().len();
+            c.telemetry_mut().clear_events();
+        }
+        (events, c.telemetry().meters(ModuleId::DeSmack).triggers - before)
+    }
+
+    /// Fading out, a lookahead module still detects, but that audio leaves the slot after the
+    /// fade has ended (latency 960 > fade 480): it is never removed, so it is not reported
+    /// (RT review 2026-11-14: spurious auto-saved catches). Triggers stay in step with events.
+    #[test]
+    fn fade_out_drops_events_for_audio_that_leaves_dry() {
+        let mut c = chain_with(vec![Box::new(Reporter::new(960, 0))]);
+        assert_eq!(run_counting(&mut c, 640), (10, 10));
+        c.set_enabled(0, false);
+        assert_eq!(run_counting(&mut c, 1024), (0, 0), "events reported for audio that played dry");
+        assert_eq!(c.slot_state(0), Some(SlotState::Off));
+    }
+
+    /// Without lookahead the audio fading out is still partly processed: its events stay.
+    #[test]
+    fn fade_out_keeps_events_for_audio_still_partly_processed() {
+        let mut c = chain_with(vec![Box::new(Reporter::new(0, 0))]);
+        let _ = run_counting(&mut c, 640);
+        c.set_enabled(0, false);
+        // Fade 480 = 7.5 blocks: 8 blocks have some processed signal.
+        assert_eq!(run_counting(&mut c, 1024), (8, 8));
+    }
+
+    /// Warming up, the output is dry: events for audio that leaves the slot during warm-up are
+    /// dropped; a lookahead detector's events (audio leaving after warm-up) are kept.
+    #[test]
+    fn warm_up_drops_only_events_for_audio_that_leaves_dry() {
+        for (back, expected) in [(128, 0), (0, 2)] {
+            let mut c = chain_with(vec![Box::new(Reporter::new(128, back))]);
+            c.set_enabled(0, false);
+            let _ = run_counting(&mut c, 1024);
+            c.set_enabled(0, true);
+            assert_eq!(run_counting(&mut c, 128), (expected, expected as u64), "back {back}");
+            assert!(matches!(c.slot_state(0), Some(SlotState::FadingIn { .. })));
+        }
+    }
+
+    /// Warm-up ends on a chunk boundary: a chunk where `remaining` runs out is still all dry,
+    /// so events for audio leaving anywhere in it are dropped too (review finding).
+    #[test]
+    fn warm_up_ending_mid_chunk_still_drops_that_chunks_events() {
+        let mut c = chain_with(vec![Box::new(Reporter::new(100, 100))]);
+        c.set_enabled(0, false);
+        let _ = run_counting(&mut c, 1024);
+        c.set_enabled(0, true);
+        assert_eq!(run_counting(&mut c, 128), (0, 0));
+        assert!(matches!(c.slot_state(0), Some(SlotState::FadingIn { .. })));
+    }
+
+    /// A module whose output was replaced by dry (non-finite) removed nothing in that block,
+    /// and its lookahead was emptied: its events from that block are dropped (review finding).
+    #[test]
+    fn faulting_block_reports_no_events() {
+        struct BadReporter(Reporter, u32);
+        impl Module for BadReporter {
+            fn id(&self) -> ModuleId {
+                ModuleId::DeSmack
+            }
+            fn prepare(&mut self, sr: f32, b: usize, ch: usize) {
+                self.0.prepare(sr, b, ch);
+            }
+            fn reset(&mut self) {
+                self.0.reset();
+            }
+            fn process(&mut self, block: &mut AudioBlock<'_>, t: &mut TelemetryWriter) {
+                self.0.process(block, t);
+                self.1 += 1;
+                if self.1 == 2 {
+                    block.channel_mut(0)[0] = f32::NAN;
+                }
+            }
+        }
+        let mut c = chain_with(vec![Box::new(BadReporter(Reporter::new(0, 0), 0))]);
+        assert_eq!(run_counting(&mut c, 128), (1, 1), "only the clean block reports");
+        assert_eq!(c.faults(), 1);
     }
 
     #[test]

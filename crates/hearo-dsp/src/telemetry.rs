@@ -139,6 +139,31 @@ impl TelemetryWriter {
         &self.events[..self.len]
     }
 
+    /// Number of buffered events: a mark for [`retain_events_since`](Self::retain_events_since).
+    #[inline]
+    pub fn event_count(&self) -> usize {
+        self.len
+    }
+
+    /// Drop the events recorded since `mark` for which `keep` is false, and uncount their
+    /// triggers (the chain uses this for audio a slot didn't remove). Order is kept; events
+    /// that overflowed the buffer can't be inspected and stay counted. Real-time safe.
+    pub fn retain_events_since(&mut self, mark: usize, mut keep: impl FnMut(&Event) -> bool) {
+        let from = mark.min(self.len);
+        let mut kept = from;
+        for i in from..self.len {
+            let e = self.events[i];
+            if keep(&e) {
+                self.events[kept] = e;
+                kept += 1;
+            } else {
+                let m = &mut self.meters[e.module.index()];
+                m.triggers = m.triggers.saturating_sub(1);
+            }
+        }
+        self.len = kept;
+    }
+
     /// Forget buffered events (call after draining them).
     pub fn clear_events(&mut self) {
         self.len = 0;
@@ -169,5 +194,19 @@ mod tests {
         assert_eq!(t.meters(ModuleId::DeClick).triggers, (EVENT_CAPACITY + 5) as u64);
         t.clear_events();
         assert!(t.events().is_empty());
+    }
+
+    #[test]
+    fn retain_since_mark_uncounts_dropped_events_only() {
+        let mut t = TelemetryWriter::new();
+        t.push_event(Event { start_sample: 1, ..ev() });
+        let mark = t.event_count();
+        for s in 2..6 {
+            t.push_event(Event { start_sample: s, ..ev() });
+        }
+        t.retain_events_since(mark, |e| e.start_sample % 2 == 1);
+        let kept: Vec<u64> = t.events().iter().map(|e| e.start_sample).collect();
+        assert_eq!(kept, [1, 3, 5], "events before the mark are untouched, order kept");
+        assert_eq!(t.meters(ModuleId::DeClick).triggers, 3);
     }
 }

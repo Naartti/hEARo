@@ -177,7 +177,12 @@ lock-free SPSC ring (relaxed slot stores, published by a Release `head`; a full 
 counts, never waits) and clears them. `LiveEngine::drain_events` reads them on one control
 thread. An event's `start_sample` is on the chain's input clock, which is the capture ring's
 frame clock (both see every frame in the same chunks), so `LiveEngine::capture_window` can cut
-unprocessed audio around it — the basis of auto-saved de-smack catches (ADR 0018). The
+unprocessed audio around it — the basis of auto-saved de-smack catches (ADR 0018). Events mean
+"removed": the chain drops (and uncounts) events a warming-up or fading-out slot reports for
+audio that leaves it while its output is fully dry (a lookahead module still detects then;
+2026-11-15), and the IOProc publishes none under global bypass. The per-module trigger counts in
+`Stats` (the popover's "removed" count, the menu bar's `.removing` glow) count the same events:
+they stand still, and the reduction meter reads 0, while bypassed. The
 `hearo-supervisor` thread drains the ring every tick (even with auto-save off), runs
 `hearo_engine::autocapture` under the engine lock, and writes the clip (`snapshots::save_auto`)
 after releasing it; an hourly sweep deletes untouched auto clips past their retention.

@@ -8,18 +8,20 @@ ADR 0016 turned on Dependabot for GitHub Actions and Cargo (weekly, grouped, 14-
 this adds `uv` for `ml/`. Each PR runs `just ci` on a hosted Mac, but hosted runs skip the CPU
 budgets, and live audio is only testable on a real Mac. The owner wants Claude Code to handle
 these PRs on its own and only hear about what needs a decision. AGENTS.md says the human
-merges, so the exception needs a written rule. `main` is protected by a ruleset that requires
-the `just ci` check (set up by the owner).
+merges, so the exception needs a written rule. The owner adds `just ci` as a required check to
+the `main` ruleset; the routine merges nothing until it sees that rule.
 
 ## Decision
 
 We handle dependency updates with a weekly agent routine (the `dependency-updates` skill). The
 agent merges a Dependabot PR itself only when the diff touches nothing but manifests, lockfiles
-or workflow pins, it is a grouped patch/minor (or security patch/minor) update, hosted checks
+or workflow pins, it is a grouped or security update in which every bump is semver-compatible
+(no majors, no 0.x minor bumps, no non-patch bump of a crate an ADR rests on), hosted checks
 are green, and, for Cargo, a local `just ci` (golden tests + CPU budgets) is green. One merge at
 a time, waiting for `main` to go green. Majors, red runs and anything needing code changes go
 through the normal workflow with the human merging; updates not worth doing now are ignored via
-`@dependabot ignore` and recorded in PROGRESS.md. A breaking merge is reverted first, then fixed.
+`@dependabot ignore` and recorded in PROGRESS.md. A breaking merge is reverted first (the agent
+may merge a pure revert plus a Dependabot `ignore:` entry), then fixed.
 
 ## Alternatives considered
 

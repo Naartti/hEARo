@@ -64,11 +64,12 @@ This is the default workflow for every request; the human never has to restate i
 ## Dependency updates (Dependabot)
 
 Weekly, and at once for a security alert, run the `dependency-updates` skill (ADR 0019). It is
-the one exception to "the human merges": a grouped patch/minor Dependabot PR that only touches
-manifests, lockfiles or workflow pins may be merged by the agent once hosted checks are green
-and, for Cargo, a local `just ci` (golden + CPU budgets) passes. Majors, red runs and anything
-needing code changes follow "Any change"; deferred updates are ignored on the PR and noted
-under *Dependency notes* in PROGRESS.md.
+the one exception to "the human merges": the agent may merge (a) a grouped or security
+Dependabot PR whose every bump is semver-compatible and that only touches manifests, lockfiles
+or workflow pins, once hosted checks are green and, for Cargo, a local `just ci` (golden + CPU
+budgets) passes; (b) a revert of such a merge (revert + `ignore:` entry only). Majors, 0.x
+minor bumps, red runs and anything needing code changes follow "Any change"; deferred updates
+are ignored and noted under *Dependency notes* in PROGRESS.md.
 
 ## Other commands (always via just)
 

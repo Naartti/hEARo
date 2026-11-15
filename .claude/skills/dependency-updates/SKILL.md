@@ -15,12 +15,15 @@ force-push, never change repo settings.
 1. Clean tree; `git switch main && git pull --ff-only`.
 2. `main` is green: `gh run list --workflow ci.yml --branch main --limit 1`. If it is red, fix
    that first (normal workflow) — never merge updates onto a red `main`.
+3. GitHub enforces the gate: `gh api repos/Naartti/hEARo/rules/branches/main --jq
+   '.[] | select(.type=="required_status_checks")'` lists `just ci`. If not, merge nothing:
+   triage only and tell the human the ruleset is missing.
 
 ## 1. Inventory
 
 ```sh
 gh pr list --author app/dependabot --json number,title,headRefName,mergeable,statusCheckRollup,files
-gh api repos/Naartti/hEARo/dependabot/alerts --jq '.[] | select(.state=="open") |
+gh api --paginate 'repos/Naartti/hEARo/dependabot/alerts?state=open' --jq '.[] |
   {number, severity: .security_advisory.severity, pkg: .dependency.package.name, fix: .security_vulnerability.first_patched_version.identifier}'
 ```
 
@@ -48,8 +51,9 @@ Then:
   pins stay `@<sha> # vX.Y.Z` (the hygiene check enforces it); no new workflow steps.
 - Release notes in the PR body: look for *breaking*, *MSRV*, *yanked*, *security*, behaviour
   changes. Anything alarming → class B.
-- **Cargo only**: hosted runners skip the CPU budgets, so run them here:
-  `gh pr checkout <n> && just ci` (includes golden tests and budgets). Then `git switch main`.
+- **Cargo only**: hosted runners skip the CPU budgets, so run them here: `gh pr checkout <n>`,
+  then `just ci` (includes golden tests and budgets), then — pass or fail — `git switch main`
+  and `git branch -D <dependabot branch>` before doing anything else. Never branch from it.
 - A new transitive crate is checked for licence/advisories by cargo-deny in `just ci`; also
   confirm it isn't reachable from RT code doing allocation/locking (`cargo tree -i <crate>`);
   if it is in `hearo-dsp`/`hearo-engine`'s tree and new, run rt-safety-reviewer (effort high)
@@ -66,10 +70,11 @@ swift-ui-reviewer / ml-reviewer), `just ci`, PR with How to verify. The human me
 Dependabot closes its own PR once `main` contains the version. Don't push commits onto
 Dependabot's branch (it then stops rebasing it).
 
-**C — defer.** The fix is out of proportion now, or upstream is broken. Comment
-`@dependabot ignore this major version` (or `... minor version` / `... dependency`) with the
-reason, and add a line under *Dependency notes* in docs/PROGRESS.md Backlog (what, why, when to
-retry). Undo later with `@dependabot unignore <dep>`.
+**C — defer.** The fix is out of proportion now, or upstream is broken. On the open PR comment
+`@dependabot ignore <dependency> major version` (or `minor version`, or `@dependabot ignore
+<dependency>` for all versions) — name the dependency: the `this ...` forms don't work on
+grouped PRs. Add a line under *Dependency notes* in docs/PROGRESS.md Backlog (what, why, when
+to retry). Undo later with `@dependabot unignore <dependency>`.
 
 ## 3. Housekeeping
 
@@ -81,10 +86,13 @@ retry). Undo later with `@dependabot unignore <dep>`.
 
 ## 4. If something breaks after a merge
 
-1. Red `main`: `git switch -c revert/<dep>-<version>`, `git revert <sha>`, `just check`, push,
-   PR; the agent may merge a pure revert once green (it restores a tested state).
-2. Comment `@dependabot ignore this <major|minor> version` on the reopened PR (or note it for
-   the next run), record it under *Dependency notes*, then treat it as class B.
+1. `git switch -c revert/<dep>-<version>` from `main`, `git revert <sha>`. In the same branch,
+   add an `ignore:` entry for that dependency and version to `.github/dependabot.yml` (with a
+   comment pointing at *Dependency notes*) — the merged PR is gone, so a comment command can't
+   stop Dependabot re-proposing it. `just check`, push, PR. The agent may merge this PR once
+   green when it contains only the revert and the ignore entry (it restores a tested state).
+2. Record it under *Dependency notes*, then fix it as class B; the fix PR removes the
+   `ignore:` entry.
 3. Breakage only visible live (audio, permissions): `debug-audio` skill first; same revert path.
 
 ## 5. Report

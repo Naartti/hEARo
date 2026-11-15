@@ -78,13 +78,16 @@ Staging doesn't change the fingerprint. Humans aren't affected.
 
 **Agent `gh` scope.** `.claude/settings.json` auto-allows some `gh` commands by prefix, and a
 prefix can't see which repository `--repo`/`-R`, `GH_REPO`, `GH_HOST`, `--hostname`, a URL or a
-`gh api` path selects. The same Bash hook (`.claude/hooks/gh_scope.py`) scans the raw command
-and, if it mentions `gh` and anything in it points beyond `Naartti/hEARo`, returns a PreToolUse
-**ask** decision: the command becomes a normal permission prompt instead of running. It also
-asks for mutating `gh api` calls (`-X` other than GET, `-f`/`-F`/`--input`, GraphQL) and for
-`gh pr checkout` of a PR not authored by Dependabot or the owner, since `just ci` would run that
-PR's code. It never blocks, so a false positive (say, a link in a comment body) costs one prompt.
-Commands that match no allow rule (`command gh …`, `bash -c …`) prompt anyway.
+`gh api` path selects. The same Bash hook (`.claude/hooks/gh_scope.py`) scans the command text
+(quotes and line continuations removed) and, if it mentions `gh` and anything in it points
+beyond `Naartti/hEARo`, returns a PreToolUse **ask** decision: the command becomes a normal
+permission prompt instead of running. It also asks when the command uses `$`/backtick
+expansion, changes directory (`cd`, `git -C`, `GIT_DIR`) or runs outside the project, for
+mutating `gh api` calls (`-X` other than GET, `-f`/`-F`/`--input`, GraphQL), and for `gh pr
+checkout` of a PR not authored by Dependabot or the owner, since `just ci` would run that PR's
+code. If the check fails it asks too. It never blocks, so a false positive (say, a link in a
+comment body) costs one prompt. Commands that match no allow rule (`command gh …`, `bash -c …`,
+`git fetch`, `git checkout`) prompt anyway.
 
 ## Other useful targets
 

@@ -2,21 +2,35 @@
 
 All notable changes to hEARo are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html) from 1.0 on. Every user-visible change adds a line under *Unreleased* in the same pull request;
-a release renames that section ([docs/dev/RELEASING.md](docs/dev/RELEASING.md)).
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html) from 1.0 on. Every user-visible
+change adds a line under *Unreleased* in the same pull request; a release renames that
+section ([docs/dev/RELEASING.md](docs/dev/RELEASING.md)).
 
 ## Unreleased
+
+## [0.2.0] - 2026-11-15
 
 ### Added
 
 - `hearo dataset eval`: score a detector against your reviewed snapshots (regions found,
   false positives, catches you rejected in review).
+- Review: a caption under the *Reviewed* toggle reminds you to mark every mouth noise first,
+  because the unmarked rest of a reviewed clip counts as clean audio for training.
 
 ### Changed
 
 - De-smack leaves quiet and dull bursts alone: a smack must peak within *Below speech* (new
   setting, 22 dB) of the speech level and have ≥ 10 % of its energy above 1.5 kHz. On 111
   reviewed clips: false positives 132 → 81 with the same 37 smacks found.
+- The settings window is called "Settings…" everywhere (it was "Advanced settings…" and
+  "Advanced…" in some menus), and the ⋯ menu shows its ⌘, shortcut.
+
+### Fixed
+
+- With global bypass on, the popover's trigger count and the menu bar's "removing" glow no
+  longer move, and modules only report clicks and smacks they actually removed (none while
+  fading in or out, none after a fault).
+- Review: flipping *Reviewed* no longer shifts the buttons in the header.
 
 ## [0.1.0] - 2026-11-15
 

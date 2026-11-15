@@ -35,7 +35,8 @@ At release time *Unreleased* should already be complete. The release PR only ren
    bump the minor version (0.1.0 → 0.2.0) and fixes alone bump the patch (0.2.0 → 0.2.1);
    from 1.0 on, [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Change `version` in
    [Cargo.toml](../../Cargo.toml) (the workspace version, which the app bundle also uses) and
-   [ml/pyproject.toml](../../ml/pyproject.toml), then run `(cd ml && uv lock)`; `just check`
+   [ml/pyproject.toml](../../ml/pyproject.toml) plus `__version__` in
+   `ml/hearo_ml/__init__.py`, then run `(cd ml && uv lock)`; `just check`
    updates `Cargo.lock` but runs uv with `--frozen`, which doesn't. In CHANGELOG.md, rename `## Unreleased` to
    `## [<version>] - <YYYY-MM-DD>` and add an empty `## Unreleased` above it. Commit
    `chore(release): v<version>`, open a PR and wait for green checks; the maintainer merges

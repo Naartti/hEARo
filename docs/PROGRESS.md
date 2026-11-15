@@ -219,11 +219,15 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
           gate still keeps the detector busy ≤ 20 ms.
           Done 2026-11-15 (owner's plan step 3b). Acceptance (the owner's bar): on the reviewed
           clips, at least as many smacks and fewer false positives; golden tests unchanged.
-          Hold: done (tests at 44.1/48/96 kHz: the reference moves < 0.5 dB across a loud
-          burst, was 2 dB; and it follows louder speech again afterwards). 230 clips: 63 / 92
-          smacks, false positives 222 → 218. Early drop of dull bursts: measured, not taken
-          (no smack found, +1 FP). Measured on the same clips; the held-out-day test set
-          (ADR 0017) is for the ML stage. Reviews: rt clean; dsp — see next item.
+          Done as a *restore*: a burst that stays quiet afterwards (a smack, or a dull/quiet
+          burst the gate lets go) sets the speech reference back to its pre-burst value (tests
+          at 44.1/48/96 kHz: moves < 0.5 dB, was 2 dB; a quieter smack right after a loud
+          smack or a thump is now ducked too; the reference still follows speech). 230
+          clips: 63 / 92 smacks, 222 false positives — unchanged. A blanket *hold* (freeze
+          while any burst is judged) measured 63 / 218 but skipped word onsets that open an
+          event and are dropped (code review: biases the reference low), so not taken. Early
+          drop of dull bursts: not taken (no smack found, +1 FP). Reviews: rt clean (on the
+          hold; the restore adds two `min`s per confirmed smack); dsp — see next item.
     - [ ] Gradual-onset smacks (follow-up, DSP review 2026-11-15): a 6 ms pause grace with
           *below speech* 18 dB measured 64 / 206 (vs 63 / 218), but ducks stops with a 3–10 ms
           voice bar before the burst (48 kHz 10 → 28 of 178), which the golden stop generator

@@ -38,6 +38,17 @@ pub use stats::{Stats, StatsSnapshot};
 /// The app's bundle id; also the prefix of the private aggregate device UIDs hEARo creates.
 pub const BUNDLE_ID: &str = "io.github.naartti.hearo";
 
+/// UID of the private aggregate device hEARo creates for process `pid` and tap `tap_id`.
+pub fn aggregate_uid(pid: impl std::fmt::Display, tap_id: impl std::fmt::Display) -> String {
+    format!("{BUNDLE_ID}.aggregate.{pid}.{tap_id}")
+}
+
+/// Whether a device UID belongs to a hEARo aggregate (this build's, or one created by a
+/// still-running build from before the 2026-11-15 rename, which used `dev.hearo`).
+pub fn is_own_device(uid: &str) -> bool {
+    uid.starts_with(&format!("{BUNDLE_ID}.")) || uid.starts_with("dev.hearo.")
+}
+
 /// Bundle-ID prefixes excluded from processing by default: music players and DAWs (§13.3).
 pub const DEFAULT_EXCLUDES: &[&str] = &[
     "com.apple.Music",
@@ -78,5 +89,15 @@ mod tests {
         assert!(!is_excluded("com.spotify.clientele", DEFAULT_EXCLUDES));
         assert!(!is_excluded("com.microsoft.teams2", DEFAULT_EXCLUDES));
         assert!(!is_excluded("", DEFAULT_EXCLUDES));
+    }
+
+    #[test]
+    fn aggregate_uids_are_recognised_as_our_own() {
+        let uid = aggregate_uid(4242, 17);
+        assert_eq!(uid, "io.github.naartti.hearo.aggregate.4242.17");
+        assert!(is_own_device(&uid));
+        assert!(is_own_device("dev.hearo.aggregate.1.2"), "pre-rename builds");
+        assert!(!is_own_device("BuiltInSpeakerDevice"));
+        assert!(!is_own_device("io.github.naartti.hearosomething"));
     }
 }

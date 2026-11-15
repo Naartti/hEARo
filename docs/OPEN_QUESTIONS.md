@@ -39,9 +39,13 @@ pause: short, sharp, bright transient) are "VERY annoying".
 ## H4 (early) — Capture real lip smacks — OPEN (ongoing)
 
 Keep capturing in meetings, podcasts and videos (ADR 0017, docs/ml/README.md): press **`§`**
-right after a smack (or turn on auto-save in Settings); in Review, mark *every* mouth noise in
-a clip before marking it reviewed; press `f` on dulled consonants too. Snapshots stay local
-(`~/Library/Application Support/hEARo/snapshots/`, never committed).
+(anywhere, no Enter) right after a smack, or turn on auto-save in Settings. The ear shows a
+checkmark (a notification + green line in `just cli run`); each press saves the last 8 s of
+*unprocessed* audio + a JSON sidecar to `~/Library/Application Support/hEARo/snapshots/`
+(local only, never committed: snapshots can contain other people's voices). In Review, mark
+*every* mouth noise in a clip before marking it reviewed; press `f` on dulled consonants too.
+Clips from different speakers/shows help most.
+Status 2026-11-15: 111 reviewed clips (incl. auto-saved catches) — see `just cli dataset eval`.
 
 ## H3 (de-smack) — Listen to the lip-smack remover — OPEN (tuning)
 

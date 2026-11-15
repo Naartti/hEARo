@@ -46,6 +46,11 @@ budgets. Those stay on a real Mac (docs/testing/HARDWARE_CHECKLIST.md).
 Core Audio shows as uncovered because its hardware tests are `#[ignore]`d. Swift coverage is
 not measured yet.
 
+`just patch-coverage` runs it and then `scripts/patch_coverage.py`: the coverage of the Rust
+lines the branch adds (against the merge base with `main`), with the uncovered line numbers per
+file. It fails where Codecov's `codecov/patch` would (below project coverage − 5 %,
+`codecov.yml`), so a PR doesn't find out on GitHub.
+
 ## Releasing
 
 Bump the version (the `release` skill has the checklist), merge to `main`, wait for CI on

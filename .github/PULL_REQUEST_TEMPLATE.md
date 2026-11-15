@@ -5,6 +5,7 @@
 ## Checklist
 
 - [ ] `just ci` passes locally (the PR check re-runs it; DSP changes: `just bench` on a Mac too)
+- [ ] `just patch-coverage` passes (new Rust code is tested; Codecov checks the same)
 - [ ] Tests written first; no test weakened or deleted
 - [ ] Real-time code (anything reachable from `Module::process`, `Chain::process` or the
       IOProc) does not allocate, lock, block, log or panic

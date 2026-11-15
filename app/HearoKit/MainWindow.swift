@@ -10,7 +10,7 @@ public enum MainTab: String, CaseIterable, Identifiable, Sendable {
     case controls
     /// Snapshot review & annotation (`ReviewView`).
     case review
-    /// Every parameter of every module (`AdvancedSettingsView`).
+    /// Every parameter of every module (`SettingsTabView`).
     case settings
 
     public var id: String { rawValue }
@@ -197,7 +197,7 @@ public struct MainWindowView: View {
             ReviewView(model: review, locale: model.locale)
         case .settings:
             // A wide window (sized for Review) would stretch the sliders; keep a readable column.
-            AdvancedSettingsView(model: model)
+            SettingsTabView(model: model)
                 .frame(maxWidth: 680)
                 .frame(maxWidth: .infinity)
         }

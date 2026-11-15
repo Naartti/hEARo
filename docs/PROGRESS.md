@@ -267,8 +267,11 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
       `DockPresence`, `AppModel.openMainWindow` / `tabCommand`; DESIGN.md *Dock icon while the
       window is open*. Checked in the app: opening → Foreground with the menus above; closing →
       UIElement, no window.
-  - [ ] Follow-up: the ⋯ menu's "Advanced settings…" opens the tab the menu bar calls
-        "Settings…" — rename it to match (and the popover's "Advanced…" link?).
+  - [x] Follow-up: the ⋯ menu's "Advanced settings…" opens the tab the menu bar calls
+        "Settings…" — rename it to match (and the popover's "Advanced…" link?). Done
+        2026-11-15: the ⋯ / right-click entry and the popover link are both **Settings…** (one
+        title, `AppMenu.Item.settings`; the menu entry shows ⌘,), the view is
+        `SettingsTabView`; DESIGN.md *One name per place* + *The hEARo window → Naming*.
   - Review notes: HANDOVER §13 left as is (the brief stays frozen; DESIGN.md records the
     deviation, like the menu bar icon decision). About/save panels open when the window
     closes may lose their Dock icon with it — accepted, accessory apps show them fine.

@@ -15,6 +15,8 @@ file records decisions and the current state.
 - **Present only while in use** (human request 2026-11-14): hEARo lives in the menu bar; it
   takes a Dock icon, ⌘Tab slot and menu bar only while its window is open. Add chrome only when
   it makes the experience better, and follow macOS convention when it does.
+- **One name per place** (2026-11-15): every control that opens a tab or window uses that
+  place's name, and the macOS name where there is one (settings are "Settings…", ⌘,).
 
 ## Menu bar icon
 
@@ -45,7 +47,7 @@ something that looks native. Also the popover as a view there to keep it open �
 validation and testing."
 
 - One `Window("hEARo", id: "main")` (`HearoKit/MainWindow.swift`) replaces the separate
-  Review snapshots and Advanced Settings windows. Tabs **Controls · Review · Settings** as a
+  Review snapshots and Advanced Settings windows (the latter's entries are now "Settings…"). Tabs **Controls · Review · Settings** as a
   segmented control in the toolbar (the Activity Monitor pattern; a sidebar would sit next to
   Review's own clip list), **⌘1–⌘3** switch (View menu, see *Dock icon while the window is
   open*; the picker's tooltip lists them). The title
@@ -58,10 +60,15 @@ validation and testing."
   is on screen (`AppModel.setLiveViewVisible`, tracked per view; a view joining doesn't restart
   the timer; Reduce Motion in either view slows it to 10×/s). "On screen" uses AppKit's
   occlusion state, so a minimised, hidden (⌘H) or fully covered window stops polling too.
-- Opening: popover window button → Controls; "Advanced…" link and ⋯ / right-click
-  "Advanced settings…" → Settings; "Review snapshots…" → Review; new menu entry **Open hEARo
+- Opening: popover window button → Controls; "Settings…" link and ⋯ / right-click
+  "Settings…" → Settings; "Review snapshots…" → Review; new menu entry **Open hEARo
   Window** → Controls. Every route activates the app (menu-bar-only apps otherwise open
-  windows behind the frontmost app). In the window, "Advanced…" just switches tabs.
+  windows behind the frontmost app). In the window, "Settings…" just switches tabs.
+- **Naming (2026-11-15):** the link and the ⋯ / right-click entry were "Advanced…" /
+  "Advanced settings…" while the tab and the app menu said "Settings"; all four are now
+  **Settings…**, the macOS name for app settings, and the ⋯ / right-click entry shows ⌘, like
+  the app menu (shared title: `AppMenu.Item.settings`). "Advanced" would also suggest a
+  second, hidden level of settings that doesn't exist — the tab *is* hEARo's settings.
 - **Sizing:** each tab has its own window size, like Xcode's settings tabs — Controls ≈ 460 ×
   640 (so it sits beside the app under test), Review 1300 × 680, Settings 600 × 720. The window
   opens at the size of the tab it opens on; switching tabs resizes it (top-left corner fixed,
@@ -104,10 +111,10 @@ experience better then we shouldn't have it. But if it's best practice then we s
 | Header: icon, name, status line ("Processing 3 apps · +18 ms · 1.4% CPU"), master switch | M0 shell |
 | **Live waveform** (below the header): original sound scrolling right→left, ~3 s, 60 columns/s, **outside-in colour bands per module** where something was turned down (see *Module colours*); polls only while the popover is open | done (human requests 2026-11-13, 2026-11-14) |
 | Full visualizer (spectrum, removed-energy colours) | M5 |
-| Modules: colour swatch (the legend), toggle, name, trigger count; under each name an **amount slider** for the module's primary parameter; "Advanced…" link | done (human request 2026-11-14), see *Module settings* |
+| Modules: colour swatch (the legend), toggle, name, trigger count; under each name an **amount slider** for the module's primary parameter; "Settings…" link | done (human request 2026-11-14), see *Module settings* |
 | Sources: apps producing audio with include/exclude | M3 |
 | Labeling hints + Review… | Review tab of the hEARo window (⋯ → "Review snapshots…"); hints M6 |
-| Footer: Settings…, Visualizer…, Quit | ⋯ menu: About hEARo / Open hEARo Window (not shown inside the window) / Review / Advanced settings / Export / Import / Show in Finder / Launch at login / **Quit (⌘Q)**; the **same menu on right-click** of the menu bar icon (`HearoKit/AppMenu.swift`, human request 2026-11-14) |
+| Footer: Settings…, Visualizer…, Quit | ⋯ menu: About hEARo / Open hEARo Window (not shown inside the window) / Review / Settings (⌘,) / Export / Import / Show in Finder / Launch at login / **Quit (⌘Q)**; the **same menu on right-click** of the menu bar icon (`HearoKit/AppMenu.swift`, human request 2026-11-14) |
 | Special states: onboarding, permission denied, engine fallback | denied state done |
 
 ## Module colours (human request 2026-11-14)
@@ -168,8 +175,8 @@ the stroke is coloured from the outside in and the uncoloured grey **core** is w
   *Sensitivity* (%; a click repair has no depth, so it is labelled for what it does), de-smack
   and de-ess *Range* (dB). Small slider, the parameter name before it and the formatted value
   after it; disabled while the module is off. VoiceOver: "De-smack range", value "12 dB".
-- **Advanced settings** — the hEARo window's **Settings** tab (see *The hEARo window*; opened
-  from the popover's "Advanced…" link or the ⋯ / right-click menu → "Advanced settings…"): a grouped
+- **Settings** — the hEARo window's **Settings** tab (`SettingsTabView`, see *The hEARo
+  window*; opened from the popover's "Settings…" link or the ⋯ / right-click menu → "Settings…"): a grouped
   form with one section per module in chain order — swatch, on/off checkbox (the limiter says
   "always on"), every parameter, the module description, and **Reset to defaults** (disabled
   when already default). Discrete parameters (`choices`, e.g. de-hum mains Auto/50/60 Hz) are

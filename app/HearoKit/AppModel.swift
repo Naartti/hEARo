@@ -107,7 +107,7 @@ public final class AppModel {
     @ObservationIgnored var dock = DockPresence()
     /// The popover's live waveform (≈ 3 s at 60 columns/s).
     public private(set) var waveform = WaveformBuffer(capacity: 180)
-    /// Module on/off and parameter values (amount sliders, Advanced settings), saved to
+    /// Module on/off and parameter values (amount sliders, Settings tab), saved to
     /// `settingsFile` when one is given.
     public let moduleSettings: ModuleSettingsModel
 

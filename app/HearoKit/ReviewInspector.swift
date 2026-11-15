@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The review window's trailing processing panel: A/B bypass, render status, live-settings
-/// buttons, and every module's toggle and parameters (the Advanced settings controls, compact).
+/// buttons, and every module's toggle and parameters (the Settings tab's controls, compact).
 /// Edits apply to a trial copy rendered offline for this clip; the live sound is untouched until
 /// "Apply these to live".
 struct ReviewInspector: View {

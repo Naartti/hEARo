@@ -379,6 +379,9 @@ See docs/HANDOVER.md §14; tasks get broken out here when the milestone starts.
 
 - 2026-11-15 — `codecov.yml`: project status tolerates a 1 % drop (patch 5 %). Human: a docs-only
   PR (#5) failed `codecov/project` at -0.02 %; the default is zero tolerance, which is noise.
+- 2026-11-15 — de-flaked `staleRenderResultIsDropped` / `onlyOneRenderRunsAtATime` (failed on a
+  hosted runner: a 50 ms sleep overshot a 300 ms fake render). The fake renderer now holds
+  chosen calls until the test releases them, so ordering no longer depends on timing.
 - 2026-11-14 — agent workflow: "Any change" section in AGENTS.md (intent capture into DESIGN.md,
   feature branch + ff-merge, test-first commits, area reviewers + branch code review, How to
   verify). CLAUDE.md maps reviewers to areas with effort levels; reviewer models pinned.

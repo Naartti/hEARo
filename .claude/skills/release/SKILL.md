@@ -13,7 +13,8 @@ it; this skill only adds what is specific to an agent doing it.
    (read the commit or PR to word it for a user; merge lines about the same thing). A missing
    entry means a PR skipped the AGENTS.md step 5 rule. Note it in the report, don't just
    paper over it.
-2. **Release PR.** On `chore/release-v<version>`: bump `Cargo.toml` + `ml/pyproject.toml`,
+2. **Release PR.** On `chore/release-v<version>`: bump `Cargo.toml` + `ml/pyproject.toml` +
+   `ml/hearo_ml/__init__.py`,
    `(cd ml && uv lock)`, rename *Unreleased*, add a fresh empty one, `just ci`, commit
    `chore(release): v<version>`, PR with the full template body. The human merges. Pick the
    version by RELEASING.md's rule and say why in the PR.

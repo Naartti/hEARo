@@ -423,14 +423,14 @@ checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
 
 [[package]]
 name = "hearo-bindgen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "uniffi",
 ]
 
 [[package]]
 name = "hearo-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -443,7 +443,7 @@ dependencies = [
 
 [[package]]
 name = "hearo-dsp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "divan",
  "hearo-testkit",
@@ -453,7 +453,7 @@ dependencies = [
 
 [[package]]
 name = "hearo-engine"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hearo-dsp",
  "hearo-testkit",
@@ -468,7 +468,7 @@ dependencies = [
 
 [[package]]
 name = "hearo-ffi"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hearo-dsp",
  "hearo-engine",
@@ -480,11 +480,11 @@ dependencies = [
 
 [[package]]
 name = "hearo-ml"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "hearo-testkit"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hound",
  "realfft",

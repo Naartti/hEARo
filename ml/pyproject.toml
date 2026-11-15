@@ -1,6 +1,6 @@
 [project]
 name = "hearo-ml"
-version = "0.1.0"
+version = "0.2.0"
 description = "hEARo ML pipeline: data, mixing, training, evaluation, ONNX export (M7)."
 requires-python = ">=3.12,<3.13"
 license = { text = "MIT OR Apache-2.0" }

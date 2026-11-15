@@ -436,6 +436,11 @@ See docs/HANDOVER.md §14; tasks get broken out here when the milestone starts.
 
 ## Log
 
+- 2026-11-15 — release 0.2.0 prepared (human: "make another version and build and release").
+  Minor bump: new features since 0.1.0 (`dataset eval`, reviewed caption). Backfilled four
+  missing *Unreleased* entries from `git log v0.1.0..main`. `ml/hearo_ml/__init__.py` holds a
+  third version copy; now listed in RELEASING.md.
+
 - 2026-11-15 — release docs + changelog rule (human: "couldn't find any docs on this"; "make
   sure Unreleased is consistently maintained for every new PR"). docs/dev/RELEASING.md is the
   one release guide (linked from docs/README.md, LOCAL_CI.md, CONTRIBUTING.md; the `release`

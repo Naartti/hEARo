@@ -1,5 +1,7 @@
 # Weekly update PRs, grouped to keep the noise down. Each one runs `just ci` in GitHub Actions;
 # Cargo bumps still follow AGENTS.md (exact pins, licence in deny.toml, API checked).
+# Handling them: the dependency-updates skill (ADR 0017). Not covered: .mise.toml toolchains
+# and app/ (no external Swift packages); bump those by hand.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -26,3 +28,16 @@ updates:
     groups:
       cargo-patch-minor:
         update-types: [minor, patch]
+  # ml/ has only dev tools (pytest, ruff) for now; one PR for all of them.
+  - package-ecosystem: uv
+    directory: /ml
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      uv:
+        patterns: ['*']

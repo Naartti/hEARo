@@ -24,7 +24,7 @@ fn engine_follows_the_default_output() {
     let other = device::outputs()
         .unwrap()
         .into_iter()
-        .find(|d| d.id != original && !d.uid.starts_with(hearo_engine::BUNDLE_ID) && !d.uid.starts_with("dev.hearo") /* pre-rename builds */ && !d.name.contains("Teams"))
+        .find(|d| d.id != original && !hearo_engine::is_own_device(&d.uid) && !d.name.contains("Teams"))
         .expect("needs a second output device");
     let engine = HearoEngine::new(vec!["desmack".into()]);
     engine.start().unwrap();

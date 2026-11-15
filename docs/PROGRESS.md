@@ -328,7 +328,7 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
         processed loads instead of 1 once; passed on re-run). Make it independent of timing.
   - [ ] First release: tag `v0.1.0` once the human says so (the `release` skill).
   - [ ] Swift coverage (`swift test --enable-code-coverage`) not measured yet.
-- [x] **Dependabot routine (human request, 2026-11-15, ADR 0017):** "let Claude Code handle the
+- [x] **Dependabot routine (human request, 2026-11-15, ADR 0019):** "let Claude Code handle the
       Dependabot PRs autonomously and make sure everything works". `dependency-updates` skill
       (triage → class A merge / B normal workflow / C ignore + note, revert path, report),
       AGENTS.md section, `uv` ecosystem for `ml/`. Owner's manual steps: Dependabot alerts +

@@ -63,7 +63,7 @@ This is the default workflow for every request; the human never has to restate i
 
 ## Dependency updates (Dependabot)
 
-Weekly, and at once for a security alert, run the `dependency-updates` skill (ADR 0017). It is
+Weekly, and at once for a security alert, run the `dependency-updates` skill (ADR 0019). It is
 the one exception to "the human merges": a grouped patch/minor Dependabot PR that only touches
 manifests, lockfiles or workflow pins may be merged by the agent once hosted checks are green
 and, for Cargo, a local `just ci` (golden + CPU budgets) passes. Majors, red runs and anything

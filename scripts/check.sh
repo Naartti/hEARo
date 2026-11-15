@@ -7,5 +7,6 @@ step "rust tests"     cargo nextest run --workspace --no-tests=pass --status-lev
 step "swift"          scripts/swift-check.sh
 step "python (ml)"    scripts/ml-check.sh
 step "repo hygiene"   scripts/check-files.sh
+step "agent hooks"    scripts/test-hooks.sh
 finish "just check"
 stamp_green

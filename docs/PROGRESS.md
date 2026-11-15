@@ -272,6 +272,9 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
         2026-11-15: the ⋯ / right-click entry and the popover link are both **Settings…** (one
         title, `AppMenu.Item.settings`; the menu entry shows ⌘,), the view is
         `SettingsTabView`; DESIGN.md *One name per place* + *The hEARo window → Naming*.
+        Review notes: kept ⌘, on the ⋯ menu inside the window although the app menu has it
+        too — both open the Settings tab, and ⌘Q already works the same way; no custom
+        VoiceOver label on the "Settings…" link (VoiceOver reads the ellipsis as menus do).
   - Review notes: HANDOVER §13 left as is (the brief stays frozen; DESIGN.md records the
     deviation, like the menu bar icon decision). About/save panels open when the window
     closes may lose their Dock icon with it — accepted, accessory apps show them fine.

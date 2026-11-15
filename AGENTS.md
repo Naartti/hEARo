@@ -22,7 +22,7 @@ locally; pin actions by commit SHA (the hygiene check enforces it).
 | Before **every** commit | `just check` (≈5 s warm, < 60 s) | rustfmt, clippy `-D warnings`, all fast Rust tests (incl. property, RT-safety, and a stress test simulating 10 min of audio in < 1 s), Swift build + tests, ruff + pytest, repo hygiene |
 | Before every push, at **milestone end**, after any dependency/toolchain bump, after touching `deny.toml`/`justfile`/`scripts/` | `just ci` | `check` + golden tests + doc tests + CPU budgets (release) + cargo-deny + cargo-machete + XcodeGen spec + actionlint + markdownlint + offline link check. Log: `target/ci/last.log` |
 | After touching DSP module code | `just test-golden`, `just bench` | measurable quality thresholds; CPU budget per block (local only: hosted runners skip budgets) |
-| Optional, after adding tests | `just coverage` | Rust line coverage → `target/coverage/html/index.html` (CI uploads it to Codecov) |
+| Before pushing a branch that adds Rust code | `just patch-coverage` | Codecov's `codecov/patch` check run locally: coverage of the added lines, uncovered line numbers per file; fails below project coverage − 5 % (`just coverage` alone → `target/coverage/html/index.html`) |
 | Docs-only change | `just docs` | lint + links |
 
 Git hooks (lefthook) enforce this: pre-commit = fmt/ruff/markdownlint/hygiene on staged files,
@@ -48,6 +48,11 @@ This is the default workflow for every request; the human never has to restate i
 4. **Branch.** `git switch -c <type>/<slug>` from `main` (type = Conventional Commits type).
 5. **Test first, commit as you go.** Failing test → code → `just check` → commit. One logical
    change per commit, every commit green, docs in the same commit, body says *why*.
+   Every new code path gets a test, CLI and tooling too: keep I/O at a thin edge (take a
+   directory or a writer as an argument, so a test can pass a temp dir or a buffer) and test
+   the logic end to end. Before pushing, `just patch-coverage` must pass — a red
+   `codecov/patch` on a PR means untested code, not a flaky check (PR #8: 59 %, an untested
+   `hearo dataset eval` driver).
 6. **Review independently** before calling it done: the area reviewers for what you touched plus
    a general review of the whole branch diff (`main...HEAD`). Fix findings test-first, one
    commit per fix, or note in PROGRESS.md why one was rejected.

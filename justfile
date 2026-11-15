@@ -67,6 +67,10 @@ test-hw:
 coverage:
     scripts/coverage.sh
 
+# Codecov's patch check, locally: coverage of the lines this branch adds (needs `just coverage`)
+patch-coverage: coverage
+    python3 scripts/patch_coverage.py
+
 # Benchmarks (divan) + enforced CPU budgets (release build)
 bench:
     cargo bench -p hearo-dsp --bench chain

@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# PreToolUse(Bash): block hook bypasses, force pushes and gh aimed at other repos.
+# PreToolUse(Bash): block hook bypasses and force pushes; ask before gh leaves this repo.
 # Tests: scripts/test-hooks.sh (run by `just check`).
 set -euo pipefail
 cmd="$(python3 "$(dirname "$0")/_input.py" tool_input.command)"
-python3 "$(dirname "$0")/gh_scope.py" <<<"$cmd" || exit 2
 if [[ "$cmd" =~ (^|[[:space:]])--no-verify([[:space:]]|$) ]]; then
   echo "Blocked: --no-verify skips the local CI hooks. Fix the failing check instead." >&2; exit 2
 fi
@@ -20,4 +19,6 @@ if [[ "$cmd" =~ (^|[\;\&\|$'\n'])[[:space:]]*git[[:space:]]+commit ]]; then
     exit 2
   fi
 fi
+# Last: prints a PreToolUse "ask" decision (JSON on stdout) when gh may reach another repo.
+python3 "$(dirname "$0")/gh_scope.py" <<<"$cmd"
 exit 0

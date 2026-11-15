@@ -77,10 +77,14 @@ Install with `lefthook install` (bootstrap does it). Don't skip with `--no-verif
 Staging doesn't change the fingerprint. Humans aren't affected.
 
 **Agent `gh` scope.** `.claude/settings.json` auto-allows some `gh` commands by prefix, and a
-prefix can't see which repository `--repo`/`-R`, `GH_REPO`, `GH_HOST`, `--hostname` or a PR URL
-selects. The same Bash hook (`.claude/hooks/gh_scope.py`) blocks any `gh` call aimed anywhere
-but `Naartti/hEARo` on github.com; links inside `--body`/`--title` text are fine.
-`gh api` is auto-allowed only under `repos/Naartti/hEARo/`.
+prefix can't see which repository `--repo`/`-R`, `GH_REPO`, `GH_HOST`, `--hostname`, a URL or a
+`gh api` path selects. The same Bash hook (`.claude/hooks/gh_scope.py`) scans the raw command
+and, if it mentions `gh` and anything in it points beyond `Naartti/hEARo`, returns a PreToolUse
+**ask** decision: the command becomes a normal permission prompt instead of running. It also
+asks for mutating `gh api` calls (`-X` other than GET, `-f`/`-F`/`--input`, GraphQL) and for
+`gh pr checkout` of a PR not authored by Dependabot or the owner, since `just ci` would run that
+PR's code. It never blocks, so a false positive (say, a link in a comment body) costs one prompt.
+Commands that match no allow rule (`command gh …`, `bash -c …`) prompt anyway.
 
 ## Other useful targets
 

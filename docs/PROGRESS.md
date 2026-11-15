@@ -328,6 +328,13 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
         processed loads instead of 1 once; passed on re-run). Make it independent of timing.
   - [ ] First release: tag `v0.1.0` once the human says so (the `release` skill).
   - [ ] Swift coverage (`swift test --enable-code-coverage`) not measured yet.
+- [x] **Dependabot routine (human request, 2026-11-15, ADR 0017):** "let Claude Code handle the
+      Dependabot PRs autonomously and make sure everything works". `dependency-updates` skill
+      (triage → class A merge / B normal workflow / C ignore + note, revert path, report),
+      AGENTS.md section, `uv` ecosystem for `ml/`. Owner's manual steps: Dependabot alerts +
+      security updates on, `just ci` required in the `main` ruleset, `gh` permissions in
+      `.claude/settings.json` (an agent may not grant itself merge rights).
+  - **Dependency notes** (ignored/deferred updates: what, why, when to retry): none yet.
 - [ ] **De-uhm (filled pauses: "uhm", "eh", Swedish "öh")** — low priority (human, 2026-11-13).
       Real time can't remove time, so the module *ducks* fillers (e.g. −12…−20 dB with soft
       fades) rather than cutting them. Needs an ML detector (voiced, speech-like) → M7/M8 after

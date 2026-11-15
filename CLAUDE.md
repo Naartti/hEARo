@@ -20,5 +20,6 @@
 - Token discipline: Explore subagent for broad searches; don't re-read files you just edited;
   don't spawn agents for a handful of tool calls. Reviewer models are pinned in
   `.claude/agents/*.md` (`opus` where correctness is subtle, `sonnet` otherwise).
-- Use skills: new-dsp-module, write-adr, ml-experiment, release, debug-audio.
+- Use skills: new-dsp-module, write-adr, ml-experiment, release, debug-audio,
+  dependency-updates (weekly Dependabot pass).
 - Prefer `just` recipes over raw commands so hooks and permissions stay simple.

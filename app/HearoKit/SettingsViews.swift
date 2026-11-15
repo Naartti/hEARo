@@ -157,8 +157,8 @@ public struct ModuleSettingsSection: View {
     }
 }
 
-/// The hEARo window's Settings tab ("Advanced settings"): every parameter of every module, live.
-public struct AdvancedSettingsView: View {
+/// The hEARo window's Settings tab: every parameter of every module, live.
+public struct SettingsTabView: View {
     @Bindable var model: AppModel
     @State private var confirmReset = false
 
@@ -302,9 +302,9 @@ struct PrimaryParamRow: View {
 }
 
 // PreviewProvider rather than #Preview (no macro plugin with Command Line Tools).
-struct AdvancedSettingsView_Previews: PreviewProvider {
+struct SettingsTabView_Previews: PreviewProvider {
     static var previews: some View {
-        AdvancedSettingsView(model: AppModel(engine: FakeEngine(.previewRunning)))
+        SettingsTabView(model: AppModel(engine: FakeEngine(.previewRunning)))
             .frame(width: 520, height: 700)
     }
 }

@@ -82,7 +82,7 @@ extension EngineSettings {
     }
 }
 
-/// The live module settings: what the popover's amount sliders and the Advanced settings window
+/// The live module settings: what the popover's amount sliders and the hEARo window's Settings tab
 /// show and change. Every change goes to the engine at once (live within one audio buffer) and
 /// is saved to the settings file shortly after the last change (debounced, so dragging a slider
 /// writes once). The engine clamps and snaps; the model then shows the engine's values.

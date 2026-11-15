@@ -7,20 +7,30 @@ import UniformTypeIdentifiers
 @MainActor
 public struct AppMenu {
     public enum Item: Equatable {
-        case about, window, review, advanced, export, `import`, showInFinder, launchAtLogin(on: Bool), quit, divider
+        case about, window, review, settings, export, `import`, showInFinder, launchAtLogin(on: Bool), quit, divider
 
         public var title: String {
             switch self {
             case .about: "About hEARo"
             case .window: "Open hEARo Window"
             case .review: "Review snapshots…"
-            case .advanced: "Advanced settings…"
+            // Named like the tab it opens and the app menu's Settings… ⌘, (DESIGN.md).
+            case .settings: "Settings…"
             case .export: "Export snapshots…"
             case .import: "Import snapshots…"
             case .showInFinder: "Show snapshots in Finder"
             case .launchAtLogin: "Launch at login"
             case .quit: "Quit hEARo"
             case .divider: ""
+            }
+        }
+
+        /// ⌘-key shown in the menu: the standard ones for Settings… and Quit.
+        var keyEquivalent: String {
+            switch self {
+            case .settings: ","
+            case .quit: "q"
+            default: ""
             }
         }
     }
@@ -39,7 +49,7 @@ public struct AppMenu {
 
     public var items: [Item] {
         // Without the window hEARo has no app menu (menu-bar-only), so "About" lives here, first.
-        var out: [Item] = [.about, .divider] + (inWindow ? [] : [.window]) + [.review, .advanced, .divider, .export, .import, .showInFinder]
+        var out: [Item] = [.about, .divider] + (inWindow ? [] : [.window]) + [.review, .settings, .divider, .export, .import, .showInFinder]
         if model.canLaunchAtLogin { out += [.divider, .launchAtLogin(on: model.launchAtLogin)] }
         return out + [.divider, .quit]
     }
@@ -49,7 +59,7 @@ public struct AppMenu {
         case .about: Self.showAbout()
         case .window: show(.controls)
         case .review: show(.review)
-        case .advanced: show(.settings)
+        case .settings: show(.settings)
         case .export: exportPanel()
         case .import: importPanel()
         case .showInFinder: NSWorkspace.shared.open(model.snapshotFolder)
@@ -98,6 +108,7 @@ public struct AppMenu {
             case .launchAtLogin(let on):
                 Toggle(item.title, isOn: Binding(get: { on }, set: { _ in perform(item) }))
             case .quit: Button(item.title) { perform(item) }.keyboardShortcut("q")
+            case .settings: Button(item.title) { perform(item) }.keyboardShortcut(",")
             default: Button(item.title) { perform(item) }
             }
         }
@@ -111,7 +122,7 @@ public struct AppMenu {
                 menu.addItem(.separator())
                 continue
             }
-            let mi = ClosureMenuItem(title: item.title, keyEquivalent: item == .quit ? "q" : "") { perform(item) }
+            let mi = ClosureMenuItem(title: item.title, keyEquivalent: item.keyEquivalent) { perform(item) }
             if case .launchAtLogin(let on) = item { mi.state = on ? .on : .off }
             menu.addItem(mi)
         }

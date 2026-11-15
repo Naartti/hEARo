@@ -26,8 +26,8 @@ how much it does:
 
 Changes are heard immediately and remembered across restarts (in
 `~/Library/Application Support/hEARo/settings.json`). For every parameter of every module
-(thresholds, frequencies, attack/release, the limiter ceiling…), click **Advanced…** under the
-list, or choose **Advanced settings…** from the ⋯ menu or by right-clicking the menu bar icon.
+(thresholds, frequencies, attack/release, the limiter ceiling…), click **Settings…** under the
+list, or choose **Settings…** (⌘,) from the ⋯ menu or by right-clicking the menu bar icon.
 Each module has **Reset to defaults**; **Reset All…** resets every value (which modules are on
 stays as it is). **Bypass (A/B)** in the popover switches to the unprocessed sound and back.
 

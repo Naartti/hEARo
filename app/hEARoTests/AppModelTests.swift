@@ -217,13 +217,15 @@ struct AppModelTests {
 struct AppMenuTests {
     @Test func sameEntriesWithAboutFirstAndQuitLast() {
         let menu = AppMenu(model: AppModel(engine: FakeEngine(.previewRunning)), show: { _ in })
-        #expect(menu.items == [.about, .divider, .window, .review, .advanced, .divider, .export, .import, .showInFinder, .divider, .quit])
+        #expect(menu.items == [.about, .divider, .window, .review, .settings, .divider, .export, .import, .showInFinder, .divider, .quit])
         #expect(menu.nsMenu().items.map(\.title) == [
-            "About hEARo", "", "Open hEARo Window", "Review snapshots…", "Advanced settings…", "", "Export snapshots…",
+            "About hEARo", "", "Open hEARo Window", "Review snapshots…", "Settings…", "", "Export snapshots…",
             "Import snapshots…", "Show snapshots in Finder", "", "Quit hEARo",
         ])
         #expect(menu.nsMenu().items.first?.keyEquivalent == "")
         #expect(menu.nsMenu().items.last?.keyEquivalent == "q")
+        // Settings… shows the same ⌘, as the app menu's Settings… (MainWindowCommands).
+        #expect(menu.nsMenu().items.first { $0.title == "Settings…" }?.keyEquivalent == ",")
     }
 
     @Test func aboutVersionShowsBuildShaAndDebugOnlyForDebugBuilds() {
@@ -244,14 +246,16 @@ struct AppMenuTests {
         #expect(credits.contains("never sent anywhere"))
     }
 
-    /// Window, Review and Advanced all open the one hEARo window, each on its own tab.
+    /// Window, Review and Settings all open the one hEARo window, each on its own tab.
     @Test func windowEntriesOpenTheMainWindowOnTheirTab() {
         var shown: [MainTab] = []
         let menu = AppMenu(model: AppModel(engine: FakeEngine(.previewRunning)), show: { shown.append($0) })
         menu.perform(.window)
         menu.perform(.review)
-        menu.perform(.advanced)
+        menu.perform(.settings)
         #expect(shown == [.controls, .review, .settings])
-        #expect(AppMenu.Item.advanced.title == "Advanced settings…")
+        // Named like the app menu's Settings… that opens the same tab (DESIGN.md, *The hEARo window*).
+        #expect(AppMenu.Item.settings.title == "Settings…")
+        #expect(AppMenu.Item.settings.title == MainWindowCommands.items.first { $0.tab == .settings }?.title)
     }
 }

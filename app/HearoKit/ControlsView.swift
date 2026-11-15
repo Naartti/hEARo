@@ -140,16 +140,14 @@ public struct ControlsView: View {
             }
             HStack {
                 Spacer()
-                Button("Advanced…") { openAdvanced() }
-                    .accessibilityLabel("Advanced settings")
+                // Same name as the ⋯ menu entry, the tab and the app menu's Settings… (DESIGN.md).
+                Button(AppMenu.Item.settings.title) { show(.settings) }
                     .buttonStyle(.link)
                     .font(.caption)
                     .help("Every parameter of every module (also in the ⋯ menu)")
             }
         }
     }
-
-    private func openAdvanced() { show(.settings) }
 
     /// In the window, switch tabs; from the popover, open the window on that tab.
     private func show(_ tab: MainTab) {

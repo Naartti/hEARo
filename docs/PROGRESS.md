@@ -177,16 +177,17 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
         reviewed snapshots, cut false positives substantially without losing real smacks, keep
         every golden test. Done: `hearo dataset eval` (scores against all reviewed clips;
         reproduces 85/92 live rejections offline) and a salience gate — ≤ *below speech*
-        (`below_speech`, new param, 18 dB) under the speech level and ≥ 10 % of its energy above 1.5 kHz. FPs 126 →
-        60, rejected re-caught 85 → 35, regions found 37 → 35 / 56. Deep dive 06 tuning log.
-        Reviews: rt (clean), dsp + code review (all fixed except the follow-ups below).
-    - [ ] Human: re-listen; if still too eager, try *Below speech* 15 dB in Settings (47 FPs,
-          35 found) or 12 dB (32 FPs, 33 found). Then look at the 21 missed regions and the FPs
-          left with `just cli dataset eval -v`.
+        (`below_speech`, new param, 22 dB) under the speech level and ≥ 10 % of its energy
+        above 1.5 kHz. 111 reviewed clips: FPs 132 → 81, rejected re-caught 90 → 50, the same
+        37 / 56 regions found (catch-by-catch: the gate never adds a catch). Default first 18 dB;
+        raised to 22 after the human's bar "fewer FPs and at least as many smacks" (18 lost 2).
+        Deep dive 06 tuning log. Reviews: rt (clean), dsp + code review (fixed except below).
+    - [ ] Human: listen; if still too eager, try *Below speech* 18 dB (66 FPs, 35 found) or
+          15 dB (53, 35) in Settings. Then the 19 missed regions and the FPs left
+          (`just cli dataset eval -v`).
     - [ ] DSP review follow-ups: hold the speech tracker while a burst is open (a loud smack
           lifts the reference ≈ 3 dB for the next one in a cluster); a dull burst that fails the
-          gate still keeps the detector busy ≤ 20 ms; 18 dB default sits 0.1 dB from the quietest
-          synthetic smack.
+          gate still keeps the detector busy ≤ 20 ms.
     - [ ] Auto-save sidecars list every slot in `modules`, not which were enabled or their live
           params, so `dataset eval` runs upstream modules at defaults: record both.
   - [ ] Investigate the 11 `missed` snapshots captured 2026-11-14 afternoon (all 0 dB reduced

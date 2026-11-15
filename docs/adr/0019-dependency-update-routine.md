@@ -1,4 +1,4 @@
-# 0017. Dependency updates: weekly agent routine, agent merges green Dependabot bumps
+# 0019. Dependency updates: weekly agent routine, agent merges green Dependabot bumps
 
 Date: 2026-11-15 · Status: accepted
 

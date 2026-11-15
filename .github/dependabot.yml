@@ -1,6 +1,6 @@
 # Weekly update PRs, grouped to keep the noise down. Each one runs `just ci` in GitHub Actions;
 # Cargo bumps still follow AGENTS.md (exact pins, licence in deny.toml, API checked).
-# Handling them: the dependency-updates skill (ADR 0017). Not covered: .mise.toml toolchains
+# Handling them: the dependency-updates skill (ADR 0019). Not covered: .mise.toml toolchains
 # and app/ (no external Swift packages); bump those by hand.
 version: 2
 updates:

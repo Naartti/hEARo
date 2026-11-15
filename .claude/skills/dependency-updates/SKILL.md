@@ -3,7 +3,7 @@ name: dependency-updates
 description: Weekly routine for Dependabot PRs and alerts - triage, verify, merge the safe ones, fix or defer the rest, report. Use when asked to handle Dependabot/dependency PRs, on a security alert, or for the weekly dependency pass.
 ---
 
-# Dependency updates (ADR 0017)
+# Dependency updates (ADR 0019)
 
 Run weekly (or right away for a security alert). The agent may merge a Dependabot PR **itself**
 when it is in class A below and every gate is green; anything where the agent wrote code goes

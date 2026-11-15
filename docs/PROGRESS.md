@@ -332,8 +332,12 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
       Dependabot PRs autonomously and make sure everything works". `dependency-updates` skill
       (triage → class A merge / B normal workflow / C ignore + note, revert path, report),
       AGENTS.md section, `uv` ecosystem for `ml/`. Owner's manual steps: Dependabot alerts +
-      security updates on, `just ci` required in the `main` ruleset, `gh` permissions in
-      `.claude/settings.json` (an agent may not grant itself merge rights).
+      security updates on, `just ci` required in the `main` ruleset. `gh` read/comment/rerun
+      permissions added by the owner; `gh pr merge` deliberately left out, so merges prompt.
+      The Bash hook turns any auto-allowed `gh` call that may reach another repo, mutate via
+      `gh api` or check out a non-Dependabot PR back into a prompt (`gh_scope.py`, 57 cases in
+      `scripts/test-hooks.sh`, run by `just check`). Two review rounds; known limit: a
+      determined adversary with arbitrary shell can always find a path the prefix rules miss.
   - **Dependency notes** (ignored/deferred updates: what, why, when to retry): none yet.
 - [ ] **De-uhm (filled pauses: "uhm", "eh", Swedish "öh")** — low priority (human, 2026-11-13).
       Real time can't remove time, so the module *ducks* fillers (e.g. −12…−20 dB with soft

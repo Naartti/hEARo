@@ -7,6 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 idx="$(mktemp)"
 trap 'rm -f "$idx"' EXIT
-cp "$(git rev-parse --git-path index)" "$idx" 2>/dev/null || true
+# No index yet (fresh repo): start from none; git rejects a zero-byte index file.
+cp "$(git rev-parse --git-path index)" "$idx" 2>/dev/null || rm -f "$idx"
 GIT_INDEX_FILE="$idx" git add -A
 GIT_INDEX_FILE="$idx" git write-tree

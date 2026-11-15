@@ -12,8 +12,9 @@ section ([docs/dev/RELEASING.md](docs/dev/RELEASING.md)).
 
 - hEARo's bundle id is now `io.github.naartti.hearo` (was `dev.hearo.app`). After updating,
   allow **System Audio Recording** once more and switch *Launch at login* back on if you used
-  it; your other settings carry over. Remove the old *hEARo* entry from System Settings →
-  Privacy & Security → Screen & System Audio Recording if it lingers.
+  it; your other settings carry over. Old *hEARo* entries may linger in System Settings →
+  Privacy & Security → Screen & System Audio Recording and in General → Login Items &
+  Extensions: remove them.
 
 ## [0.2.0] - 2026-11-15
 

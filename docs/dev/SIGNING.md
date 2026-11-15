@@ -45,8 +45,8 @@ The fixed bundle ID, path and identity keep the permission across rebuilds. Ad-h
 new release), allow **System Audio Recording** again when asked, and re-enable *Launch at
 login* if you used it — both belong to the bundle ID. Preferences (auto-save, Review options,
 window positions) are copied once from the old ID at launch (`DefaultsMigration`); module
-settings live in `settings.json` and need nothing. Optionally remove the stale entry in System
-Settings → Privacy & Security.
+settings live in `settings.json` and need nothing. Remove the stale entries in System Settings
+→ Privacy & Security and → General → Login Items & Extensions.
 
 **Migrating from "hEARo Dev"** (builds before 2026-11-14 used `dev.hearo.app.dev`): quit
 *hEARo Dev*, delete `~/Applications/hEARo Dev.app`, run `just app`, allow **System Audio

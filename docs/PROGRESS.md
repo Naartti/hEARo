@@ -348,9 +348,17 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
         reflogs removed. `.github/CODEOWNERS` → @naartti.
   - [x] Owner: check the `dev.hearo` bundle-id prefix. Done 2026-11-15: "we don't want dev" →
         `io.github.naartti.hearo` (ADR 0005 amendment; `hearo_engine::BUNDLE_ID` also prefixes
-        the aggregate UIDs). Acceptance: no `dev.hearo` left outside history docs; preferences
+        the aggregate UIDs; `tests/bundle_id.rs` keeps Info.plist and project.yml in step).
+        Acceptance: no `dev.hearo` left outside history (ADRs, CHANGELOG, migration notes) and
+        the frozen brief docs/HANDOVER.md, which stays as written like §13; preferences
         copied once from the old ID (`DefaultsMigration`, 3 tests); CHANGELOG says to re-grant
         System Audio Recording and Launch at login.
+        Review notes: fixed — compare against the app's own domain (not registered/global
+        values), login-item cleanup in the upgrade note, a consistency test for the ID, the
+        stale "os_log logger in M3" claim (no code logs to the subsystem yet), H4 instructions
+        restored. Rejected: filtering AppKit keys out of the copy (window and status-item
+        positions are wanted); deleting the old domain (an older build would lose its
+        settings); a test for `runForApp` (a two-line I/O edge over the tested `run`).
   - [ ] Proposals: move HANDOVER/PROGRESS/OPEN_QUESTIONS to docs/project/; crates inherit
         authors/repository once a URL exists; ARCHITECTURE crate table misses hearo-bindgen.
 - [ ] **Proper open-source project on GitHub (human request, 2026-11-14):** "looks like and

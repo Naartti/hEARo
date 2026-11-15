@@ -12,9 +12,11 @@ updates:
       default-days: 14
     commit-message:
       prefix: ci
+    # Groups take only minor/patch; majors arrive as their own PRs (class B in the skill).
     groups:
       actions:
         patterns: ['*']
+        update-types: [minor, patch]
   - package-ecosystem: cargo
     directory: /
     schedule:
@@ -41,3 +43,4 @@ updates:
     groups:
       uv:
         patterns: ['*']
+        update-types: [minor, patch]

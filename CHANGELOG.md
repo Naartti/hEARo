@@ -19,8 +19,7 @@ section ([docs/dev/RELEASING.md](docs/dev/RELEASING.md)).
 ### Fixed
 
 - The open popover or Controls tab no longer costs a large share of a CPU core: the live
-  waveform now redraws on its own instead of refreshing every control 30 times a second
-  (≈ 5× less main-thread work).
+  waveform now redraws on its own instead of refreshing every control 30 times a second.
 
 ## [0.2.0] - 2026-11-15
 

@@ -312,7 +312,16 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
         read only inside `WaveformView`. Main-thread cost with the controls on screen
         (`HEARO_PERF=1 swift test --filter LiveViewCost`, debug build): 7.2 → 1.3 ms per
         frame, 21.6 % → 3.9 % of a core; the VoiceOver summary is ≈ 0.1 ms of that, the rest is
-        the Canvas. Guarded by `waveformPollOnlyInvalidatesTheWaveform`.
+        the Canvas. Guarded by `waveformPollOnlyInvalidatesTheWaveform` and
+        `unchangedStatusPollDoesNotInvalidateTheControls` (both track everything
+        `ControlsView` reads). Review notes: fixed — test covers all of ControlsView's reads,
+        `waveform` forwarder internal, restart = one buffer assignment, no debug-build ratio in
+        the CHANGELOG. Rejected: equality checks before assigning `snapshot`/`iconState` and
+        `@ObservationIgnored` on the flash bookkeeping (`@Observable` already skips equal
+        Equatable assignments — the new test proves it — and no view reads the bookkeeping);
+        caching the VoiceOver summary (0.1 ms/frame measured); asserting a CPU bound in the
+        opt-in harness (timing-dependent; the invalidation tests are the gate). Release-build
+        `top` check is in the PR's How to verify.
 - [x] **Dock icon while the window is open (human request 2026-11-14):** "if it's best practice
       then we should". Acceptance: (a) no Dock icon, not in ⌘Tab, no menu bar while only the
       menu bar icon/popover is in use, and none at launch; (b) opening the hEARo window by any

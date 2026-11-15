@@ -83,7 +83,7 @@ const MIN_PAUSE_MS: f32 = 8.0;
 const PAUSE_GRACE_MS: f32 = 3.0;
 /// A smack's energy above 1.5 kHz must be at most this many dB below its broadband energy
 /// (bright). Dull bursts in pauses — thumps, breath, low mouth noise — were the human-rejected
-/// catches' commonest shape (2026-11-15).
+/// catches' second most common shape, after quiet ones (2026-11-15). ≥ 16 % HF energy.
 const SALIENT_HF_SHARE_DB: f32 = 8.0;
 
 const PARAMS: [ParamDesc; 4] = [

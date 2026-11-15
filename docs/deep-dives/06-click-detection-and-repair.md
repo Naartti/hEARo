@@ -52,8 +52,8 @@ All six conditions must hold (`crates/hearo-dsp/src/modules/desmack.rs`):
    fast, but aspiration or voicing follows within 5–20 ms. (Measured: 10 ms of required quiet
    still dulled 26 % of stops, 20 ms → 2–4 %; [ADR 0011](../adr/0011-desmack-lookahead-and-io-buffer.md).)
 6. **Salient:** loud against the speech and bright. Its 2 ms peak is at most *below speech*
-   (18 dB) under the speech level when it started, and at most 8 dB of its energy lies below
-   1.5 kHz. Added after the human reviewed 108 auto-saved catches (2026-11-15) and rejected 92:
+   (18 dB) under the speech level when it started, and its energy above 1.5 kHz is at most
+   8 dB below its total energy (≥ 16 % of it is high-frequency). Added after the human reviewed 108 auto-saved catches (2026-11-15) and rejected 92:
    the rejected ones were mostly quiet (median 25 dB under the speech, vs 3 dB for accepted
    smacks) or dull (thumps, breath, low mouth noise). The smacks people find annoying are the
    loud, bright ones.
@@ -130,7 +130,7 @@ audio, and attenuating to the room tone sounds natural: the listener hears a sho
 | stay quiet 20 ms + 40 ms lookahead | 0.93–0.95 | 0 | 0 | 13–17 | stops 2 %, but **real smacks: 2/19** — 5 ms envelopes too slow for real room tone |
 | 2 ms decay envelopes, age limit on the burst only | 0.93–0.95 | 0 | 1 | 13–17 | stops 4 %; real: 14/19 |
 | re-open on ticks + provisional duck (long smacks) | **0.93–0.95** | **0** | **1.5** | **13–17** | stops 4 %; long smacks 0.83–0.97, −21…−23 dB after 8 ms; **real labelled regions ≥ 10 dB: 5/23 → 17/23** (17/34 with the 11 snapshots added later) |
-| salience gate: ≤ 18 dB below speech, ≥ −8 dB HF share (2026-11-15) | **0.90–0.95** | **0** | **1.5** | **13–16** | real (`hearo dataset eval`, 106 reviewed clips): false positives 126 → 60, human-rejected spans re-caught 85 → 35, regions found 37 → 34 of 56. Stricter *below speech* trades on: 15 dB → 47 FPs / 34 found, 12 dB → 32 / 33. Synthetic smacks keep ≥ 90 % recall only down to 17 dB |
+| salience gate: ≤ 18 dB below speech, HF ≥ 16 % of the energy (2026-11-15) | **0.90–0.95** | **0** | **1.5** | **13–16** | real (`hearo dataset eval`, 106 reviewed clips): false positives 126 → 60, human-rejected spans re-caught 85 → 35, regions found 37 → 34 of 56. Stricter *below speech* trades on: 15 dB → 47 FPs / 34 found, 12 dB → 32 / 33. Synthetic smacks keep ≥ 90 % recall only down to 17 dB |
 | *(rejected)* settling slow tails | 0.93–0.95 | 0 | 1.5 | 13–17 | loud slow-tailed smacks 0/29 → 29/29, but word-final / weak-aspiration stops 12–27 % ducked (released ducks, invisible to the stop test) |
 
 **Real snapshots (19 clips, the human's `§` presses):** a smack is ducked 0.3–2.5 s before the
@@ -139,7 +139,8 @@ proxies — the real clips overruled them once already (the 2/19 row above).
 
 ## Limits (honest list)
 
-- Quiet or dull smacks (more than *below speech* under the speech level, or mostly < 1.5 kHz)
+- Quiet or dull smacks (more than *below speech* under the speech level, or < 16 % of their
+  energy above 1.5 kHz)
   are deliberately left alone: on real clips nearly all such catches were false positives.
 - Smacks **overlapping speech** aren't handled — the "in a pause" condition is the whole point.
   That's the ML stage (§7.6).

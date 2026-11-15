@@ -326,7 +326,8 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
         (which also changes the mise cache key).
   - [ ] Flaky on the hosted runner: `ReviewInspectorTests.staleRenderResultIsDropped` (saw 2
         processed loads instead of 1 once; passed on re-run). Make it independent of timing.
-  - [ ] First release: tag `v0.1.0` once the human says so (the `release` skill).
+  - [x] First release: `v0.1.0` (human said go, 2026-11-15): CHANGELOG moved under 0.1.0 on
+        `chore/release-v0.1.0`; tag pushed after the PR merged and CI on `main` was green.
   - [ ] Swift coverage (`swift test --enable-code-coverage`) not measured yet.
 - [x] **Dependabot routine (human request, 2026-11-15, ADR 0019):** "let Claude Code handle the
       Dependabot PRs autonomously and make sure everything works". `dependency-updates` skill

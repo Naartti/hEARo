@@ -16,6 +16,12 @@ section ([docs/dev/RELEASING.md](docs/dev/RELEASING.md)).
   Privacy & Security → Screen & System Audio Recording and in General → Login Items &
   Extensions: remove them.
 
+### Fixed
+
+- The open popover or Controls tab no longer costs a large share of a CPU core: the live
+  waveform now redraws on its own instead of refreshing every control 30 times a second
+  (≈ 5× less main-thread work).
+
 ## [0.2.0] - 2026-11-15
 
 ### Added

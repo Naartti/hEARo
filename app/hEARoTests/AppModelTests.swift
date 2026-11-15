@@ -177,6 +177,31 @@ struct AppModelTests {
         #expect(model.waveform.columns.count == 1)
     }
 
+    /// A waveform poll (30×/s) must only invalidate the waveform itself: anything else the
+    /// controls read (status, modules, the waveform's owner) re-rendering at 30 Hz cost ≈ 20 % of
+    /// a core with the popover open (LiveViewCostTests).
+    @Test func waveformPollOnlyInvalidatesTheWaveform() {
+        let engine = FakeEngine(.previewRunning)
+        let model = AppModel(engine: engine)
+        let controlsChanged = Flag()
+        let waveformChanged = Flag()
+        withObservationTracking {
+            _ = model.snapshot
+            _ = model.isOn
+            _ = model.statusLine
+            _ = model.moduleNames
+            _ = model.liveWaveform
+        } onChange: { controlsChanged.set() }
+        withObservationTracking { _ = model.liveWaveform.buffer } onChange: { waveformChanged.set() }
+
+        engine.nextWaveform = WaveformChunk(next: 2, peaks: [0.5, 0.5], removed: [false, false])
+        model.pollWaveform()
+
+        #expect(!controlsChanged.value)
+        #expect(waveformChanged.value)
+        #expect(model.liveWaveform.buffer.columns.count == 2)
+    }
+
     @Test func exportAndImportReportResults() {
         let engine = FakeEngine(.previewRunning)
         let model = AppModel(engine: engine)
@@ -258,4 +283,10 @@ struct AppMenuTests {
         #expect(AppMenu.Item.settings.title == "Settings…")
         #expect(AppMenu.Item.settings.title == MainWindowCommands.items.first { $0.tab == .settings }?.title)
     }
+}
+
+/// Records that an observation fired (its `onChange` runs synchronously on the mutating thread).
+private final class Flag: @unchecked Sendable {
+    private(set) var value = false
+    func set() { value = true }
 }

@@ -4,18 +4,20 @@ import SwiftUI
 /// down, the outer part of the stroke is painted in the module's colour, as deep as the cut
 /// (`ReductionBands`); the grey core is what is playing.
 public struct WaveformView: View {
-    let buffer: WaveformBuffer
+    /// Read only inside `body`, so a poll redraws this view and nothing around it.
+    let source: LiveWaveform
     /// Module display names by key (VoiceOver summary); falls back to the key.
     let names: [String: String]
     @Environment(\.colorScheme) private var scheme
 
-    public init(buffer: WaveformBuffer, names: [String: String] = [:]) {
-        self.buffer = buffer
+    public init(source: LiveWaveform, names: [String: String] = [:]) {
+        self.source = source
         self.names = names
     }
 
     public var body: some View {
-        Canvas { ctx, size in
+        let buffer = source.buffer
+        return Canvas { ctx, size in
             let cols = buffer.columns
             let w = size.width / CGFloat(max(buffer.capacity, 1))
             let mid = size.height / 2
@@ -94,8 +96,8 @@ struct BandPainter {
 
 struct WaveformView_Previews: PreviewProvider {
     static var previews: some View {
-        var b = WaveformBuffer(capacity: 180)
-        b.append(FakeEngine.syntheticWaveform(columns: 180, start: 0))
-        return WaveformView(buffer: b).frame(width: 332, height: 56).padding()
+        let live = LiveWaveform(capacity: 180)
+        live.buffer.append(FakeEngine.syntheticWaveform(columns: 180, start: 0))
+        return WaveformView(source: live).frame(width: 332, height: 56).padding()
     }
 }

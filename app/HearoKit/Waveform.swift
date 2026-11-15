@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 
 /// New waveform columns from the engine (60 per second, oldest first), aligned with the output.
 public struct WaveformChunk: Sendable, Equatable {
@@ -24,6 +25,15 @@ public struct WaveformChunk: Sendable, Equatable {
         self.outputPeaks = outputPeaks
         self.reductions = reductions
     }
+}
+
+/// The live waveform's columns as an observable of their own: views that read `buffer` redraw
+/// on every poll; views that only hold the `LiveWaveform` don't.
+@MainActor
+@Observable
+public final class LiveWaveform {
+    public internal(set) var buffer: WaveformBuffer
+    public init(capacity: Int) { buffer = WaveformBuffer(capacity: capacity) }
 }
 
 /// The last `capacity` columns shown in the popover (newest last = right edge).

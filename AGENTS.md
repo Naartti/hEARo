@@ -66,6 +66,13 @@ This is the default workflow for every request; the human never has to restate i
    pull --ff-only`. Report: the PR link, what changed, decisions made, review findings, and the
    How to verify checklist.
 
+   Every PR gets that full description, never an empty or commit-subject-only one: no
+   `gh pr create --fill`, and no draft as a stand-in for a missing body (a draft means work in
+   progress, nothing else). This holds when the human runs the commands: if you hand them a
+   branch to push (e.g. a change you may not make yourself), give them the PR command with a
+   `--body-file` you wrote, or open/edit the PR yourself afterwards (`gh pr edit <n>
+   --body-file`). PR #9 (2026-11-15) went up empty from a handed-over `--fill`.
+
 ## Dependency updates (Dependabot)
 
 Weekly, and at once for a security alert, run the `dependency-updates` skill (ADR 0019). It is

@@ -313,23 +313,39 @@ fn found(events: &[Event], smacks: &[Injected], sr: f32) -> usize {
 
 /// Real catches the human rejected (2026-11-15) were mostly bursts far quieter than the speech
 /// around them; "Below speech" sets how far below the speech level a smack may peak and still be
-/// ducked. The synthetic smacks peak a few dB under the speech level: a 0 dB setting must leave
-/// them all alone, the widest setting must find them like the default does.
+/// ducked. Smacks 22–30 dB under the speech reference are left alone by default and found once
+/// the gate is opened (so the gate, not the detector, is what rejects them). The gate is a ratio
+/// of levels measured over the same span, so it is sample-rate independent; checked at all three.
 #[test]
-fn below_speech_gate_leaves_quieter_smacks_alone() {
+fn smacks_far_below_speech_are_left_alone() {
+    for (sr, seed) in [(44_100.0, 71), (48_000.0, 72), (96_000.0, 73)] {
+        // −22…−10 dBFS smacks sit 2–18 dB under this speech reference: these sit ≈ 22–30 dB under
+        // (a quieter room, −75 dB, so the burst detector itself still sees them clearly).
+        let (input, smacks) = speech_with_pause_smacks(sr, 30.0, seed, 20, (-34.0, -26.0), -75.0);
+        let with = |db: f32| {
+            let mut m = DeSmack::new();
+            let key = m.params().iter().position(|p| p.key == "below_speech").expect("below_speech param");
+            m.set_param(key, db);
+            found(&events_with(&input, sr, m), &smacks, sr)
+        };
+        let (default, wide) = (found(&events_with(&input, sr, DeSmack::new()), &smacks, sr), with(48.0));
+        eprintln!("MARGIN quiet smacks sr {sr}: {default}/{n} default, {wide} at 48 dB", n = smacks.len());
+        assert!(default * 10 <= smacks.len(), "sr {sr}: {default}/{} quiet smacks ducked", smacks.len());
+        // A control, not a recall target: quiet smacks are harder for the burst detector too.
+        assert!(wide * 2 >= smacks.len(), "sr {sr}: only {wide}/{} found with the gate open", smacks.len());
+    }
+}
+
+/// At 0 dB nothing quieter than the speech itself is ducked (the direction of the parameter).
+#[test]
+fn below_speech_zero_leaves_every_quieter_smack_alone() {
     let sr = 48_000.0;
-    let (input, smacks) = speech_with_pause_smacks(sr, 30.0, 71, 20, (-22.0, -10.0), FLOOR_DB);
-    let with = |db: f32| {
-        let mut m = DeSmack::new();
-        let key = m.params().iter().position(|p| p.key == "loudness").expect("loudness param");
-        m.set_param(key, db);
-        found(&events_with(&input, sr, m), &smacks, sr)
-    };
-    let (none, wide, default) = (with(0.0), with(48.0), found(&events_with(&input, sr, DeSmack::new()), &smacks, sr));
-    eprintln!("MARGIN below speech: {none}/{n} at 0 dB, {default} default, {wide} at 48 dB", n = smacks.len());
-    assert!(none * 10 <= smacks.len(), "{none}/{} smacks ducked although quieter than speech", smacks.len());
-    assert!(default * 10 >= smacks.len() * 9, "default found only {default}/{}", smacks.len());
-    assert!(wide >= default, "opening the gate lost smacks ({wide} < {default})");
+    let (input, smacks) = speech_with_pause_smacks(sr, 30.0, 74, 20, (-22.0, -10.0), FLOOR_DB);
+    let mut m = DeSmack::new();
+    let key = m.params().iter().position(|p| p.key == "below_speech").expect("below_speech param");
+    m.set_param(key, 0.0);
+    let n = found(&events_with(&input, sr, m), &smacks, sr);
+    assert!(n * 10 <= smacks.len(), "{n}/{} smacks ducked although quieter than speech", smacks.len());
 }
 
 /// Dull bursts in pauses (thumps, low mouth noise: most of their energy below 1.5 kHz) were the

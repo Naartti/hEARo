@@ -17,6 +17,9 @@
 //!    "p") look like "pause + decaying burst" too, but aspiration or voicing follows at once.
 //!    The 40 ms lookahead lets us wait for all of this before the burst reaches the output
 //!    (latency trade-off: ADR 0011).
+//! 5. it is *salient*: its 2 ms peak within `below_speech` dB of the speech level at its onset,
+//!    and ≥ 10 % of its energy above 1.5 kHz. Quiet or dull bursts were most of the catches the
+//!    human rejected (2026-11-15).
 //!
 //! Repair: the burst is turned down to about the pause level (at most `range` dB; 0 = detect
 //! only) with a 1 ms fade-in before the onset and a 5 ms fade-out, so speech starting right after
@@ -83,8 +86,11 @@ const MIN_PAUSE_MS: f32 = 8.0;
 const PAUSE_GRACE_MS: f32 = 3.0;
 /// A smack's energy above 1.5 kHz must be at most this many dB below its broadband energy
 /// (bright). Dull bursts in pauses — thumps, breath, low mouth noise — were the human-rejected
-/// catches' second most common shape, after quiet ones (2026-11-15). ≥ 16 % HF energy.
-const SALIENT_HF_SHARE_DB: f32 = 8.0;
+/// catches' second most common shape, after quiet ones (2026-11-15). 10 dB = ≥ 10 % HF energy.
+/// Swept on 106 reviewed clips with *below speech* 18 dB: 6 dB → 58 false positives / 34 smacks
+/// found, 8 → 60 / 34, 10 → 60 / 35, 12 → 62 / 35, off → 70 / 35. Synthetic smacks (with a low
+/// thump) measure −1…−6.3 dB, so 10 dB leaves ≈ 3.7 dB margin.
+const SALIENT_HF_SHARE_DB: f32 = 10.0;
 
 const PARAMS: [ParamDesc; 4] = [
     ParamDesc {
@@ -119,11 +125,13 @@ const PARAMS: [ParamDesc; 4] = [
     },
     // How far below the speech level a smack may peak and still be ducked: quieter ones are
     // left alone (most were false positives). Tuned 2026-11-15 on 106 reviewed snapshots
-    // (`hearo dataset eval`): off → 126 false positives, 25 dB → 80, 18 dB → 60, 15 dB → 47,
-    // 12 dB → 32, for 37/36/34/34/33 smacks found. 18 dB is the strictest value at which the
-    // synthetic smacks (−22…−10 dBFS over −20 dBFS RMS speech) keep ≥ 90 % recall.
+    // (`hearo dataset eval`, with the 10 dB brightness gate): no loudness gate → 70 false
+    // positives, 18 dB → 60, 15 dB → 47, 12 dB → 32 (35/35/35/33 smacks found). 18 dB is the
+    // strictest whole-dB value at which every synthetic golden test still passes (the quietest
+    // synthetic pause smack sits 17.9 dB under the reference — a thin margin). 48 dB ≈ off for
+    // any realistic level.
     ParamDesc {
-        key: "loudness",
+        key: "below_speech",
         name: "Below speech",
         unit: ParamUnit::Db,
         min: 0.0,
@@ -222,8 +230,8 @@ pub struct DeSmack {
     quiet_after: u64,
     prov_quiet: u64,
     events: [Option<Smack>; MAX_EVENTS],
-    loudness_db: f32,
-    /// `−loudness_db` / `−SALIENT_HF_SHARE_DB` as linear power factors.
+    below_speech_db: f32,
+    /// `−below_speech_db` / `−SALIENT_HF_SHARE_DB` as linear power factors.
     loud_lin: f32,
     bright_lin: f32,
     delay: MultiDelay,
@@ -287,7 +295,7 @@ impl DeSmack {
             quiet_after: 0,
             prov_quiet: 0,
             events: [None; MAX_EVENTS],
-            loudness_db: PARAMS[3].default,
+            below_speech_db: PARAMS[3].default,
             loud_lin: db_to_pow(-PARAMS[3].default),
             bright_lin: db_to_pow(-SALIENT_HF_SHARE_DB),
             delay: MultiDelay::default(),
@@ -649,7 +657,7 @@ impl Module for DeSmack {
             }
             2 => self.range_db = v,
             _ => {
-                self.loudness_db = v;
+                self.below_speech_db = v;
                 self.loud_lin = db_to_pow(-v);
             }
         }
@@ -664,7 +672,7 @@ impl Module for DeSmack {
             0 => self.threshold_db,
             1 => self.pause_db,
             2 => self.range_db,
-            3 => self.loudness_db,
+            3 => self.below_speech_db,
             _ => f32::NAN,
         }
     }

@@ -136,7 +136,7 @@ fn smack_ducking_path_does_not_allocate() {
         let mut events = 0usize;
         let mut allocs = 0;
         let slot = chain.find(ModuleId::DeSmack).expect("desmack in chain");
-        let loudness = chain.module(slot).unwrap().params().iter().position(|p| p.key == "loudness").unwrap();
+        let below_speech = chain.module(slot).unwrap().params().iter().position(|p| p.key == "below_speech").unwrap();
         let mut step = 0u32;
         while pos < sig.len() {
             let n = rng.range_usize(1, 3000).min(sig.len() - pos);
@@ -146,7 +146,7 @@ fn smack_ducking_path_does_not_allocate() {
             let (_, a) = count_allocs(|| {
                 if step.is_multiple_of(7) {
                     // "Below speech" changes mid-stream (sometimes past its 48 dB maximum).
-                    chain.set_param(slot, loudness, rng.range(17.0, 60.0));
+                    chain.set_param(slot, below_speech, rng.range(17.0, 60.0));
                 }
                 chain.process(&mut AudioBlock::from_planar(&mut buf[..2 * n], 2));
                 events += chain.telemetry().events().iter().filter(|e| e.module == ModuleId::DeSmack).count();

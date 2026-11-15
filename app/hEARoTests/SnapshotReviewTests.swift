@@ -561,6 +561,8 @@ struct ReviewedHintTests {
     @Test func captionAsksForEveryMouthNoiseUntilReviewed() {
         #expect(ReviewedHint.caption(reviewed: false) == "Mark every mouth noise first")
         #expect(ReviewedHint.caption(reviewed: true) == "Every mouth noise marked")
+        // The header reserves room for all of them (no layout shift when toggling).
+        #expect(ReviewedHint.captions == ["Mark every mouth noise first", "Every mouth noise marked"])
     }
 
     @Test func explanationSaysUnmarkedAudioIsTrainingDataAndNamesReturn() {

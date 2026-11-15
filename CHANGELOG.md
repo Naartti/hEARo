@@ -23,6 +23,8 @@ section ([docs/dev/RELEASING.md](docs/dev/RELEASING.md)).
 
 - The open popover or Controls tab no longer costs a large share of a CPU core: the live
   waveform now redraws on its own instead of refreshing every control 30 times a second.
+- De-smack: a loud smack no longer raises the bar for the next one in a cluster. On 230
+  reviewed clips it finds the same smacks with slightly fewer false alarms (218 instead of 222).
 
 ## [0.2.0] - 2026-11-15
 

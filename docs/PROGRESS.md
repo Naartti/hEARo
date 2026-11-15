@@ -214,9 +214,23 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
     - [ ] Human: listen; if still too eager, try *Below speech* 18 dB (66 FPs, 35 found) or
           15 dB (53, 35) in Settings. Then the 19 missed regions and the FPs left
           (`just cli dataset eval -v`).
-    - [ ] DSP review follow-ups: hold the speech tracker while a burst is open (a loud smack
+    - [x] DSP review follow-ups: hold the speech tracker while a burst is open (a loud smack
           lifts the reference ≈ 3 dB for the next one in a cluster); a dull burst that fails the
           gate still keeps the detector busy ≤ 20 ms.
+          Done 2026-11-15 (owner's plan step 3b). Acceptance (the owner's bar): on the reviewed
+          clips, at least as many smacks and fewer false positives; golden tests unchanged.
+          Hold: done (tests at 44.1/48/96 kHz: the reference moves < 0.5 dB across a loud
+          burst, was 2 dB; and it follows louder speech again afterwards). 230 clips: 63 / 92
+          smacks, false positives 222 → 218. Early drop of dull bursts: measured, not taken
+          (no smack found, +1 FP). Measured on the same clips; the held-out-day test set
+          (ADR 0017) is for the ML stage. Reviews: rt clean; dsp — see next item.
+    - [ ] Gradual-onset smacks (follow-up, DSP review 2026-11-15): a 6 ms pause grace with
+          *below speech* 18 dB measured 64 / 206 (vs 63 / 218), but ducks stops with a 3–10 ms
+          voice bar before the burst (48 kHz 10 → 28 of 178), which the golden stop generator
+          lacks. Test first: add voice-bar stops to `speech_with_stop_bursts` (+ golden ≤ 5 %
+          at 44.1/48/96 kHz — today's 3 ms already measures ≈ 6 % on them), then widen the
+          grace only for a soft lift (5 ms level still near the quiet line when the HF burst
+          comes). Deep dive 06 tuning log.
     - [x] Auto-save sidecars list every slot in `modules`, not which were enabled or their live
           params, so `dataset eval` runs upstream modules at defaults: record both.
           Done 2026-11-15 (owner's plan step 3a). Acceptance: every sidecar (hotkey, auto, CLI)
@@ -238,8 +252,11 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
           entries (the CLI applies params to the first slot only, already ambiguous); an
           ffi test that the sidecar gets `settings` (needs a live engine; `live_settings` is
           tested and both call sites are one line).
-  - [ ] Investigate the 11 `missed` snapshots captured 2026-11-14 afternoon (all 0 dB reduced
-        — a different cause).
+  - [x] Investigate the 11 `missed` snapshots captured 2026-11-14 afternoon (all 0 dB reduced
+        — a different cause). Done 2026-11-15: 8 such clips on disk (12:00–17:02); 1 breath
+        only, 3 caught offline since; the 4 left: noisy pause ×2 (floor 12–15 dB under speech;
+        *Pause depth* lower finds them at a FP cost, not default), gradual onset ×1 (open:
+        item above), slow wet tail ×1 (ML stage, H3 a). Deep dive 06.
   - [ ] Review suggestions left: smack 0–5 ms before a word, double clicks, digital-silence
         pauses, HF-only floor, upstream-latency-aware event timestamps.
 - [x] **De-ess** (split-band dynamic bell + onset gate, 0 lookahead). 12 golden tests at

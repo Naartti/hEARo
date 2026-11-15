@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result, bail};
 use hearo_dsp::{Module, amp_to_db, modules};
 use hearo_engine::ca::procs;
+use hearo_engine::snapshots::{LiveModule, LiveParam, LiveSettings};
 use hearo_engine::{DEFAULT_EXCLUDES, EngineConfig, LiveEngine, StatsSnapshot, is_excluded};
 
 use crate::parse_param;
@@ -183,7 +184,7 @@ pub fn run(args: &RunArgs) -> Result<()> {
         let presses = crate::hotkey::presses();
         if presses != seen_presses {
             seen_presses = presses;
-            snapshot_and_confirm(&engine, "missed", &args.modules, &mut saved);
+            snapshot_and_confirm(&engine, "missed", &args.modules, &live_settings(&enabled, &args.params), &mut saved);
         }
         if last_status.elapsed() < Duration::from_millis(500) {
             continue;
@@ -221,7 +222,13 @@ pub fn run(args: &RunArgs) -> Result<()> {
                 "b" => controls.set_bypass(!controls.bypass()),
                 "m" | "f" => {
                     let label = if cmd == "m" { "missed" } else { "false_hit" };
-                    snapshot_and_confirm(&engine, label, &args.modules, &mut saved);
+                    snapshot_and_confirm(
+                        &engine,
+                        label,
+                        &args.modules,
+                        &live_settings(&enabled, &args.params),
+                        &mut saved,
+                    );
                 }
                 n => {
                     if let Ok(i) = n.parse::<usize>()
@@ -293,8 +300,14 @@ fn finish(engine: LiveEngine, sample_rate: f64) -> Result<()> {
     Ok(())
 }
 
-fn snapshot_and_confirm(engine: &LiveEngine, label: &str, modules: &[String], saved: &mut usize) {
-    match save_snapshot(engine, label, modules) {
+fn snapshot_and_confirm(
+    engine: &LiveEngine,
+    label: &str,
+    modules: &[String],
+    settings: &LiveSettings,
+    saved: &mut usize,
+) {
+    match save_snapshot(engine, label, modules, settings) {
         Ok(path) => {
             *saved += 1;
             let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
@@ -309,10 +322,55 @@ fn snapshot_and_confirm(engine: &LiveEngine, label: &str, modules: &[String], sa
     }
 }
 
-fn save_snapshot(engine: &LiveEngine, label: &str, modules: &[String]) -> Result<std::path::PathBuf> {
+fn save_snapshot(
+    engine: &LiveEngine,
+    label: &str,
+    modules: &[String],
+    settings: &LiveSettings,
+) -> Result<std::path::PathBuf> {
     use hearo_engine::snapshots::{self, Context, Label};
     let label = if label == "missed" { Label::Missed } else { Label::FalseHit };
     let dir = snapshots::default_dir().context("HOME not set")?;
-    let ctx = Context { modules: modules.to_vec(), source: "cli".into(), ..Context::default() };
+    let ctx = Context {
+        modules: modules.to_vec(),
+        source: "cli".into(),
+        settings: Some(settings.clone()),
+        ..Context::default()
+    };
     engine.save_snapshot(&dir, label, ctx).map_err(|e| anyhow::anyhow!("{e}"))
+}
+
+/// What `hearo run` is running, for a snapshot sidecar: each module's on/off toggle and the
+/// `--param` values (others are at their defaults). `params` were validated at start.
+fn live_settings(enabled: &[(String, bool)], params: &[String]) -> LiveSettings {
+    let parsed: Vec<(String, String, f32)> = params.iter().filter_map(|p| parse_param(p).ok()).collect();
+    LiveSettings {
+        modules: enabled
+            .iter()
+            .map(|(key, on)| LiveModule {
+                key: key.clone(),
+                enabled: *on,
+                params: parsed
+                    .iter()
+                    .filter(|(m, _, _)| m == key)
+                    .map(|(_, p, v)| LiveParam { key: p.clone(), value: *v })
+                    .collect(),
+            })
+            .collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn live_settings_record_toggles_and_params() {
+        let enabled = [("desmack".to_string(), true), ("deess".to_string(), false)];
+        let s = live_settings(&enabled, &["desmack.below_speech=18".into(), "deess.range=6".into()]);
+        assert!(s.is_enabled("desmack") && !s.is_enabled("deess"));
+        assert_eq!(s.param("desmack", "below_speech"), Some(18.0));
+        assert_eq!(s.param("deess", "range"), Some(6.0));
+        assert_eq!(s.param("desmack", "range"), None);
+    }
 }

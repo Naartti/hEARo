@@ -458,7 +458,12 @@ impl HearoEngine {
     /// shouldn't have; otherwise "missed it". Returns the WAV path.
     pub fn save_snapshot(&self, false_hit: bool) -> Result<String, HearoError> {
         let mut inner = self.lock();
-        let ctx = Context { modules: inner.modules.keys.clone(), source: "app".into(), ..Context::default() };
+        let ctx = Context {
+            modules: inner.modules.keys.clone(),
+            source: "app".into(),
+            settings: Some(inner.modules.live_settings()),
+            ..Context::default()
+        };
         let engine = inner.engine().ok_or(HearoError::NotRunning)?;
         let dir = snapshots::default_dir().ok_or(HearoError::Io { message: "HOME not set".into() })?;
         let label = if false_hit { Label::FalseHit } else { Label::Missed };

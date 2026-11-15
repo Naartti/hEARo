@@ -220,6 +220,57 @@ pub struct Context {
     pub source: String,
     /// Installation id ([`device_id`]); filled in by [`save`] if empty.
     pub device: String,
+    /// Which modules were on and their parameter values when the clip was cut, so
+    /// `hearo dataset eval` can replay the chain that fed a detector live. `None` = unknown.
+    pub settings: Option<LiveSettings>,
+}
+
+/// The live chain's settings in a sidecar's `settings` key: the same shape as the app's
+/// `settings.json` (`hearo_ffi::EngineSettings`), so either can be read as the other.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct LiveSettings {
+    #[serde(default)]
+    pub modules: Vec<LiveModule>,
+}
+
+/// One module in [`LiveSettings`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct LiveModule {
+    pub key: String,
+    #[serde(default = "yes")]
+    pub enabled: bool,
+    /// Values that were set; a missing parameter had its default.
+    #[serde(default)]
+    pub params: Vec<LiveParam>,
+}
+
+/// One parameter value in [`LiveModule`].
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct LiveParam {
+    pub key: String,
+    pub value: f32,
+}
+
+fn yes() -> bool {
+    true
+}
+
+impl LiveSettings {
+    /// The `settings` a sidecar recorded, or `None` (older clips, unreadable key).
+    pub fn from_sidecar(side: &serde_json::Value) -> Option<Self> {
+        serde_json::from_value(side.get("settings")?.clone()).ok()
+    }
+
+    /// Whether `key` was in the chain and switched on.
+    pub fn is_enabled(&self, key: &str) -> bool {
+        self.modules.iter().any(|m| m.key == key && m.enabled)
+    }
+
+    /// The recorded value of `module.param` (`None` = its default).
+    pub fn param(&self, module: &str, param: &str) -> Option<f32> {
+        let m = self.modules.iter().find(|m| m.key == module)?;
+        m.params.iter().find(|p| p.key == param).map(|p| p.value)
+    }
 }
 
 /// Write `left`/`right` (unprocessed, `sample_rate`) as `<dir>/snapshot-<unix>-<label>.wav` +
@@ -380,7 +431,7 @@ fn base_sidecar(
     now: std::time::Duration,
     ctx: &Context,
 ) -> serde_json::Value {
-    serde_json::json!({
+    let mut side = serde_json::json!({
         "label": label.as_str(),
         "unix_time": now.as_secs(),
         "seconds": secs,
@@ -392,7 +443,11 @@ fn base_sidecar(
         "device": if ctx.device.is_empty() { dir.parent().map(device_id).unwrap_or_default() } else { ctx.device.clone() },
         "hearo_version": env!("CARGO_PKG_VERSION"),
         "regions": [],
-    })
+    });
+    if let Some(s) = ctx.settings.as_ref().and_then(|s| serde_json::to_value(s).ok()) {
+        side["settings"] = s;
+    }
+    side
 }
 
 #[cfg(test)]
@@ -408,6 +463,7 @@ mod tests {
             modules: vec!["gain".into()],
             source: "test".into(),
             device: "d1".into(),
+            settings: None,
         };
         let a = save(&dir, &[0.1; 480], &[0.2; 480], 48_000.0, Label::Missed, &ctx).unwrap();
         let b = save(&dir, &[0.1; 480], &[0.2; 480], 48_000.0, Label::Missed, &ctx).unwrap();
@@ -419,6 +475,42 @@ mod tests {
         assert_eq!(side["label"], "missed");
         assert!((side["press_at_s"].as_f64().unwrap() - 0.01).abs() < 1e-9);
         assert_eq!(side["device"], "d1");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn sidecar_records_the_live_settings_and_reads_them_back() {
+        let dir = std::env::temp_dir().join(format!("hearo-snap-settings-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let live = LiveSettings {
+            modules: vec![
+                LiveModule { key: "dehum".into(), enabled: false, params: vec![] },
+                LiveModule {
+                    key: "desmack".into(),
+                    enabled: true,
+                    params: vec![LiveParam { key: "below_speech".into(), value: 18.0 }],
+                },
+            ],
+        };
+        let ctx = Context { settings: Some(live.clone()), ..Context::default() };
+        let wav = save(&dir, &[0.0; 480], &[0.0; 480], 48_000.0, Label::Missed, &ctx).unwrap();
+        let side: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(wav.with_extension("json")).unwrap()).unwrap();
+        assert_eq!(side["settings"]["modules"][1]["params"][0]["key"], "below_speech");
+        assert_eq!(LiveSettings::from_sidecar(&side), Some(live.clone()));
+        assert!(live.is_enabled("desmack") && !live.is_enabled("dehum") && !live.is_enabled("deess"));
+        assert_eq!(live.param("desmack", "below_speech"), Some(18.0));
+        assert_eq!(live.param("desmack", "range"), None, "missing = the module's default");
+
+        // Older sidecars (and the CLI before 0.3) have no settings: nothing to read back.
+        let wav = save(&dir, &[0.0; 480], &[0.0; 480], 48_000.0, Label::Missed, &Context::default()).unwrap();
+        let side: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(wav.with_extension("json")).unwrap()).unwrap();
+        assert!(side.get("settings").is_none());
+        assert_eq!(LiveSettings::from_sidecar(&side), None);
+        // Missing `enabled` / `params` default like the app's settings.json.
+        let side = serde_json::json!({ "settings": { "modules": [{ "key": "deess" }] } });
+        assert!(LiveSettings::from_sidecar(&side).unwrap().is_enabled("deess"));
         std::fs::remove_dir_all(dir).unwrap();
     }
 

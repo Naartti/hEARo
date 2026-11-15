@@ -44,7 +44,7 @@ extension FakeEngine {
                 ParamInfo(id: "threshold", name: "Threshold", unit: "dB", min: 6, max: 40, defaultValue: 14),
                 ParamInfo(id: "pause", name: "Pause depth", unit: "dB", min: 0, max: 40, defaultValue: 15),
                 ParamInfo(id: "range", name: "Range", unit: "dB", min: 0, max: 48, defaultValue: 24, primary: true),
-                ParamInfo(id: "below_speech", name: "Below speech", unit: "dB", min: 0, max: 48, defaultValue: 18),
+                ParamInfo(id: "below_speech", name: "Below speech", unit: "dB", min: 0, max: 48, defaultValue: 22),
             ]),
         ModuleInfo(
             id: "deess", name: "De-ess", description: "Tames harsh \"s\" and \"sh\" sounds.",

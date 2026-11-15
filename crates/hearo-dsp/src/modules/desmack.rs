@@ -124,19 +124,19 @@ const PARAMS: [ParamDesc; 4] = [
         choices: &[],
     },
     // How far below the speech level a smack may peak and still be ducked: quieter ones are
-    // left alone (most were false positives). Tuned 2026-11-15 on 106 reviewed snapshots
-    // (`hearo dataset eval`, with the 10 dB brightness gate): no loudness gate → 70 false
-    // positives, 18 dB → 60, 15 dB → 47, 12 dB → 32 (35/35/35/33 smacks found). 18 dB is the
-    // strictest whole-dB value at which every synthetic golden test still passes (the quietest
-    // synthetic pause smack sits 17.9 dB under the reference — a thin margin). 48 dB ≈ off for
-    // any realistic level.
+    // left alone (most were false positives). Tuned 2026-11-15 on 111 reviewed snapshots
+    // (`hearo dataset eval`, with the 10 dB brightness gate; before this gate: 132 false
+    // positives, 37 smacks found): 22 dB → 81 / 37, 18 → 66 / 35, 15 → 53 / 35, 12 → 35 / 33.
+    // 22 dB is the strictest value that still finds every smack the ungated detector found (the
+    // human's bar: fewer false positives, at least as many smacks); the gate never adds a catch.
+    // 48 dB ≈ off for any realistic level.
     ParamDesc {
         key: "below_speech",
         name: "Below speech",
         unit: ParamUnit::Db,
         min: 0.0,
         max: 48.0,
-        default: 18.0,
+        default: 22.0,
         step: 0.0,
         choices: &[],
     },

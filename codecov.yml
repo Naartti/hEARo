@@ -1,0 +1,14 @@
+# Codecov is advisory here: the local `just ci` is the gate (ADR 0016). Default status checks
+# fail on any drop (even -0.02% on a docs-only PR), so allow a small tolerance.
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        target: auto
+        threshold: 5%
+comment:
+  require_changes: true

@@ -43,11 +43,14 @@ a verified smack) and **X** marks it a false positive (the sidecar's `rejected` 
 - `hearo dataset eval` scores de-smack (or `--module` another detector) against every reviewed
   clip: regions found, false positives, and how many land on rejected spans. It's how DSP
   changes are judged on real audio; clips never leave the Mac, so it isn't a CI test.
-  It replays what fed the detector live: every sidecar since 0.3 has a `settings` key (the
-  app's `settings.json` shape: which modules were on, their parameter values), and the modules
-  before the scored one run with those values. The scored module runs at its defaults plus
-  `--param`. Older clips only list the chain (`modules`), so their upstream modules run at
-  defaults; the report counts them.
+  It replays what fed the detector live: new sidecars have a `settings` key (the app's
+  `settings.json` shape: the live chain in order, which modules were on, their parameter
+  values), and the modules before the scored one run with those values. The scored module
+  runs at its defaults plus `--param`. Older clips only list the chain (`modules`), so every
+  module listed before the scored one runs at its defaults, even if it was off; the report
+  counts them and gives separate totals for the recorded clips — compare runs over time on
+  that line, since the mix shifts as new clips arrive. Known limit: settings are recorded when
+  the clip is saved, so a toggle or slider moved within the clip's 8 s isn't reflected.
 
 ### Using it
 

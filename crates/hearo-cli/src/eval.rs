@@ -160,6 +160,8 @@ pub struct ClipResult {
     pub dets: Vec<(Span, f32, Verdict)>,
     /// Target regions nothing hit.
     pub missed: Vec<Span>,
+    /// The chain and recorded values it was replayed with.
+    pub replay: Replay,
 }
 
 /// Everything `hearo dataset eval` reports.
@@ -173,46 +175,67 @@ pub struct Report {
     pub skipped: Vec<(String, String)>,
     /// Scored clips whose sidecar predates recorded live settings (upstream at defaults).
     pub without_settings: usize,
+    /// Totals over clips replayed from recorded settings only: older clips replay every listed
+    /// upstream module, switched off or not, so mixing them shifts the totals as the share of
+    /// recorded clips grows. Compare runs over time on this one.
+    pub recorded: Score,
 }
 
 /// `(module, param, value)`, as parsed from `--param module.param=value`.
-pub type ParamValue = (String, String, f32);
+pub type ParamOverride = (String, String, f32);
 
 /// How to rebuild what fed `module` live in one clip.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Replay {
-    /// Upstream modules that were on, in chain order, then `module`.
+    /// Upstream modules that were on, in the live chain's order, then `module`.
     pub keys: Vec<String>,
     /// Recorded values of the upstream modules.
-    pub params: Vec<ParamValue>,
+    pub params: Vec<ParamOverride>,
     /// The sidecar recorded its live settings; `false` = older clip, every module it lists
     /// before `module` runs at its defaults (the on/off state wasn't recorded).
     pub recorded: bool,
 }
 
+/// Keys before `module` in a live chain's order. A chain that didn't contain `module` fed it
+/// nothing; its modules that come earlier in the standard order (`modules::KEYS`) stand in.
+fn upstream_of<'a>(chain: &[&'a str], module: &str) -> Vec<&'a str> {
+    match chain.iter().position(|k| *k == module) {
+        Some(i) => chain[..i].to_vec(),
+        None => {
+            let before: Vec<&str> = modules::KEYS.iter().copied().take_while(|k| *k != module).collect();
+            chain.iter().copied().filter(|k| before.contains(k)).collect()
+        }
+    }
+}
+
 /// [`Replay`] for `module` from a sidecar. The scored module itself always runs at its defaults
 /// (plus `--param`), so a change is judged against the factory setting, not the live one.
-pub fn replay(side: &serde_json::Value, module: &str) -> Replay {
-    let upstream = modules::KEYS.iter().copied().take_while(|k| *k != module);
-    let (keys, params, recorded): (Vec<&str>, Vec<ParamValue>, bool) = match snapshots::LiveSettings::from_sidecar(side)
-    {
-        Some(live) => {
-            let keys: Vec<&str> = upstream.filter(|k| live.is_enabled(k)).collect();
-            let params = live
-                .modules
-                .iter()
-                .filter(|m| keys.contains(&m.key.as_str()))
-                .flat_map(|m| m.params.iter().map(|p| (m.key.clone(), p.key.clone(), p.value)))
-                .collect();
-            (keys, params, true)
-        }
-        None => {
-            let listed: Vec<&str> =
-                side["modules"].as_array().map(|a| a.iter().filter_map(|m| m.as_str()).collect()).unwrap_or_default();
-            (upstream.filter(|k| listed.contains(k)).collect(), Vec::new(), false)
-        }
-    };
-    Replay { keys: keys.into_iter().chain(std::iter::once(module)).map(String::from).collect(), params, recorded }
+/// Errs on a `settings` key that is there but unreadable (not the same as an older clip).
+pub fn replay(side: &serde_json::Value, module: &str) -> std::result::Result<Replay, String> {
+    let (keys, params, recorded): (Vec<String>, Vec<ParamOverride>, bool) =
+        match snapshots::LiveSettings::from_sidecar(side) {
+            Some(Ok(live)) => {
+                let order: Vec<&str> = live.modules.iter().map(|m| m.key.as_str()).collect();
+                let keys: Vec<String> =
+                    upstream_of(&order, module).into_iter().filter(|k| live.is_enabled(k)).map(String::from).collect();
+                let params = live
+                    .modules
+                    .iter()
+                    .filter(|m| keys.contains(&m.key))
+                    .flat_map(|m| m.params.iter().map(|p| (m.key.clone(), p.key.clone(), p.value)))
+                    .collect();
+                (keys, params, true)
+            }
+            Some(Err(e)) => return Err(format!("unreadable live settings ({e})")),
+            None => {
+                let listed: Vec<&str> = side["modules"]
+                    .as_array()
+                    .map(|a| a.iter().filter_map(|m| m.as_str()).collect())
+                    .unwrap_or_default();
+                (upstream_of(&listed, module).into_iter().map(String::from).collect(), Vec::new(), false)
+            }
+        };
+    Ok(Replay { keys: keys.into_iter().chain(std::iter::once(module.to_string())).collect(), params, recorded })
 }
 
 /// Score `module` over every reviewed snapshot in `dir`, replaying the modules that fed it live
@@ -220,7 +243,7 @@ pub fn replay(side: &serde_json::Value, module: &str) -> Replay {
 pub fn evaluate(dir: &Path, module: &str, params: &[String]) -> Result<Report> {
     let id = ModuleId::from_key(module).with_context(|| format!("unknown module '{module}'"))?;
     anyhow::ensure!(!target_classes(id).is_empty(), "no labelled class to score '{module}' against");
-    let params: Vec<(String, String, f32)> = params.iter().map(|p| crate::parse_param(p)).collect::<Result<_>>()?;
+    let params: Vec<ParamOverride> = params.iter().map(|p| crate::parse_param(p)).collect::<Result<_>>()?;
     for (m, param, _) in &params {
         let probe = modules::create(m).with_context(|| format!("unknown module '{m}' in --param"))?;
         anyhow::ensure!(probe.params().iter().any(|d| d.key == param), "module '{m}' has no parameter '{param}'");
@@ -242,7 +265,13 @@ pub fn evaluate(dir: &Path, module: &str, params: &[String]) -> Result<Report> {
             }
         };
         let sr = wav.sample_rate as f32;
-        let plan = replay(&side, module);
+        let plan = match replay(&side, module) {
+            Ok(p) => p,
+            Err(why) => {
+                r.skipped.push((stem, why));
+                continue;
+            }
+        };
         if !plan.recorded {
             r.without_settings += 1;
         }
@@ -274,10 +303,13 @@ pub fn evaluate(dir: &Path, module: &str, params: &[String]) -> Result<Report> {
         if snapshots::is_auto(&stem) {
             r.auto.add(&score);
         }
+        if plan.recorded {
+            r.recorded.add(&score);
+        }
         let missed =
             labels.targets.iter().copied().filter(|t| !spans.iter().any(|d| d.overlaps(t, TOLERANCE_S))).collect();
         let dets = found.iter().zip(verdicts).map(|((s, db), v)| (*s, *db, v)).collect();
-        r.clips.push(ClipResult { stem, score, dets, missed });
+        r.clips.push(ClipResult { stem, score, dets, missed, replay: plan });
     }
     Ok(r)
 }
@@ -292,8 +324,14 @@ pub fn write_report(r: &Report, verbose: bool, out: &mut impl Write) -> std::io:
             let s = &c.score;
             writeln!(
                 out,
-                "{}: {}/{} regions hit, {} false positives ({} rejected)",
-                c.stem, s.hit_regions, s.regions, s.false_positives, s.rejected_hits
+                "{}: {}/{} regions hit, {} false positives ({} rejected) · chain {}{}",
+                c.stem,
+                s.hit_regions,
+                s.regions,
+                s.false_positives,
+                s.rejected_hits,
+                c.replay.keys.join(" → "),
+                if c.replay.recorded { "" } else { " (not recorded, defaults)" }
             )?;
             for (d, db, v) in &c.dets {
                 writeln!(out, "    {:7.3}–{:7.3} s  {:5.1} dB  {v:?}", d.start, d.end, db)?;
@@ -327,9 +365,22 @@ pub fn write_report(r: &Report, verbose: bool, out: &mut impl Write) -> std::io:
     if r.without_settings > 0 {
         writeln!(
             out,
-            "ℹ {} clips without recorded live settings: modules before the scored one ran at their \
-             defaults, as listed (saved before hEARo 0.3)",
+            "ℹ {} clips without recorded live settings (saved by an older hEARo): every module listed \
+             before the scored one ran at its defaults, even ones that were off",
             r.without_settings
+        )?;
+    }
+    if r.without_settings < r.clips.len() {
+        let s = &r.recorded;
+        writeln!(
+            out,
+            "  replayed from recorded settings ({} clips): recall {}/{}, {} false positives, {} rejected \
+             — compare runs over time on this line",
+            r.clips.len() - r.without_settings,
+            s.hit_regions,
+            s.regions,
+            s.false_positives,
+            s.rejected_hits,
         )?;
     }
     Ok(())
@@ -508,19 +559,31 @@ mod tests {
                 { "key": "deess", "enabled": true, "params": [{ "key": "range", "value": 3.0 }] },
             ]},
         });
-        let r = replay(&side, "desmack");
+        let r = replay(&side, "desmack").unwrap();
         assert!(r.recorded);
         assert_eq!(r.keys, ["deplosive", "declick", "desmack"]);
         // Upstream values only: the scored module runs at its defaults (+ --param) so a change
         // is judged against the factory setting, and downstream modules don't feed it.
         assert_eq!(r.params, [("deplosive".to_string(), "max_cut".to_string(), 6.0)]);
 
+        // The live chain's own order counts (`hearo run --modules desmack,dehum`): de-hum ran
+        // after de-smack there, so it didn't feed it.
+        let cli = serde_json::json!({ "settings": { "modules": [{ "key": "desmack" }, { "key": "dehum" }] } });
+        assert_eq!(replay(&cli, "desmack").unwrap().keys, ["desmack"]);
+        // A chain without the scored module: its modules from earlier in the standard order.
+        let without = serde_json::json!({ "settings": { "modules": [{ "key": "deess" }, { "key": "dehum" }] } });
+        assert_eq!(replay(&without, "desmack").unwrap().keys, ["dehum", "desmack"]);
+
         // Older sidecars: every listed upstream module, at defaults.
         let old = serde_json::json!({ "modules": ["dehum", "desmack", "deess"] });
-        let r = replay(&old, "desmack");
+        let r = replay(&old, "desmack").unwrap();
         assert!(!r.recorded);
         assert_eq!(r.keys, ["dehum", "desmack"]);
         assert!(r.params.is_empty());
+
+        // A `settings` key that's there but unreadable isn't an older clip: it's an error.
+        let bad = serde_json::json!({ "settings": { "modules": [{ "key": "dehum", "params": [{ "key": "x", "value": null }] }] } });
+        assert!(replay(&bad, "desmack").unwrap_err().contains("unreadable live settings"));
     }
 
     #[test]
@@ -541,12 +604,32 @@ mod tests {
         let after = evaluate(&c.0, "desmack", &[]).unwrap();
         assert_eq!(after.without_settings, 0);
         assert_eq!(after.clips.len(), 1);
-        // De-plosive leaves speech-band smacks alone, so the found smacks don't change.
-        assert_eq!(after.total.hit_regions, before.total.hit_regions);
-        let mut out = Vec::new();
-        write_report(&before, false, &mut out).unwrap();
-        let text = String::from_utf8(out).unwrap();
-        assert!(text.contains("1 clips without recorded live settings"), "{text}");
+        // Before: the listed chain at defaults. After: de-hum dropped, de-plosive's value replayed.
+        assert_eq!(before.clips[0].replay.keys, ["dehum", "desmack"]);
+        assert_eq!(after.clips[0].replay.keys, ["deplosive", "desmack"]);
+        assert_eq!(after.clips[0].replay.params, [("deplosive".into(), "max_cut".into(), 6.0)]);
+        let text = |r: &Report| {
+            let mut out = Vec::new();
+            write_report(r, true, &mut out).unwrap();
+            String::from_utf8(out).unwrap()
+        };
+        assert_eq!(after.recorded, after.total, "the one clip is replayed from recorded settings");
+        assert_eq!(before.recorded, Score::default());
+        assert!(text(&after).contains("replayed from recorded settings (1 clips)"));
+        let old = text(&before);
+        assert!(old.contains("1 clips without recorded live settings"), "{old}");
+        assert!(old.contains("chain dehum → desmack (not recorded, defaults)"), "{old}");
+        assert!(
+            text(&after).contains("chain deplosive → desmack ·")
+                || text(&after).contains("chain deplosive → desmack\n")
+        );
+
+        // Unreadable settings: the clip is skipped and named, not scored as an older clip.
+        side["settings"] = serde_json::json!({ "modules": "nope" });
+        std::fs::write(&side_path, serde_json::to_string(&side).unwrap()).unwrap();
+        let broken = evaluate(&c.0, "desmack", &[]).unwrap();
+        assert!(broken.clips.is_empty());
+        assert!(broken.skipped.iter().any(|(s, why)| s == "snapshot-1-auto" && why.contains("live settings")));
     }
 
     #[test]

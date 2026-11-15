@@ -227,6 +227,17 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
           live values, so a change is judged against the factory setting. Real data
           (2026-11-15, 230 reviewed clips, none with settings yet): recall 63/92, 222 FPs
           (177 on rejected spans), unchanged by this.
+          Review notes (code + ML review): fixed — replay follows the recorded chain order (CLI
+          `--modules` can differ from the standard order); an unreadable `settings` key skips
+          the clip instead of passing it off as an older one; non-finite `--param` rejected;
+          separate totals for recorded clips; the report shows each clip's replayed chain (and
+          the end-to-end test checks it); `--param` parsed once in `hearo run`. Rejected:
+          recording settings per catch / flagging changes inside the clip (rare; documented
+          in docs/ml/README.md); one shared serde type for ffi and engine (the ffi records are
+          uniffi types; the round-trip test keeps the shapes in step); duplicate `--modules`
+          entries (the CLI applies params to the first slot only, already ambiguous); an
+          ffi test that the sidecar gets `settings` (needs a live engine; `live_settings` is
+          tested and both call sites are one line).
   - [ ] Investigate the 11 `missed` snapshots captured 2026-11-14 afternoon (all 0 dB reduced
         — a different cause).
   - [ ] Review suggestions left: smack 0–5 ms before a word, double clicks, digital-silence

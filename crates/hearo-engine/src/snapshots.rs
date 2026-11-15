@@ -226,7 +226,8 @@ pub struct Context {
 }
 
 /// The live chain's settings in a sidecar's `settings` key: the same shape as the app's
-/// `settings.json` (`hearo_ffi::EngineSettings`), so either can be read as the other.
+/// `settings.json` (`hearo_ffi::EngineSettings`). Unlike that file, a module missing here was
+/// not in the live chain (the CLI records only the modules it ran), so it counts as off.
 #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LiveSettings {
     #[serde(default)]
@@ -257,8 +258,11 @@ fn yes() -> bool {
 
 impl LiveSettings {
     /// The `settings` a sidecar recorded, or `None` (older clips, unreadable key).
-    pub fn from_sidecar(side: &serde_json::Value) -> Option<Self> {
-        serde_json::from_value(side.get("settings")?.clone()).ok()
+    /// `None` = no `settings` key (an older clip); `Some(Err)` = a key that can't be read
+    /// (hand edit, unknown shape), which must not be mistaken for an older clip.
+    pub fn from_sidecar(side: &serde_json::Value) -> Option<Result<Self, String>> {
+        let v = side.get("settings")?;
+        Some(serde_json::from_value(v.clone()).map_err(|e| e.to_string()))
     }
 
     /// Whether `key` was in the chain and switched on.
@@ -497,12 +501,12 @@ mod tests {
         let side: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(wav.with_extension("json")).unwrap()).unwrap();
         assert_eq!(side["settings"]["modules"][1]["params"][0]["key"], "below_speech");
-        assert_eq!(LiveSettings::from_sidecar(&side), Some(live.clone()));
+        assert_eq!(LiveSettings::from_sidecar(&side), Some(Ok(live.clone())));
         assert!(live.is_enabled("desmack") && !live.is_enabled("dehum") && !live.is_enabled("deess"));
         assert_eq!(live.param("desmack", "below_speech"), Some(18.0));
         assert_eq!(live.param("desmack", "range"), None, "missing = the module's default");
 
-        // Older sidecars (and the CLI before 0.3) have no settings: nothing to read back.
+        // Older sidecars have no settings: nothing to read back.
         let wav = save(&dir, &[0.0; 480], &[0.0; 480], 48_000.0, Label::Missed, &Context::default()).unwrap();
         let side: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(wav.with_extension("json")).unwrap()).unwrap();
@@ -510,7 +514,10 @@ mod tests {
         assert_eq!(LiveSettings::from_sidecar(&side), None);
         // Missing `enabled` / `params` default like the app's settings.json.
         let side = serde_json::json!({ "settings": { "modules": [{ "key": "deess" }] } });
-        assert!(LiveSettings::from_sidecar(&side).unwrap().is_enabled("deess"));
+        assert!(LiveSettings::from_sidecar(&side).unwrap().unwrap().is_enabled("deess"));
+        // A key that's there but unreadable is an error, not "no settings".
+        let side = serde_json::json!({ "settings": { "modules": [{ "key": "x", "params": [{ "key": "p", "value": null }] }] } });
+        assert!(LiveSettings::from_sidecar(&side).unwrap().is_err());
         std::fs::remove_dir_all(dir).unwrap();
     }
 

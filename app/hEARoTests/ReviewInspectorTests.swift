@@ -41,11 +41,25 @@ final class RecordingRenderer: ClipRenderer, @unchecked Sendable {
     private var _calls: [EngineSettings] = []
     /// Seconds to block on call n (0-based); missing = no delay.
     let delays: [Int: Double]
+    /// Calls that block until `release(n)`: ordering tests use these, not wall-clock delays,
+    /// which race on a loaded CI runner.
+    private let gates: [Int: DispatchSemaphore]
     var fail = false
 
-    init(delays: [Int: Double] = [:]) { self.delays = delays }
+    init(delays: [Int: Double] = [:], gated: Set<Int> = []) {
+        self.delays = delays
+        gates = Dictionary(uniqueKeysWithValues: gated.map { ($0, DispatchSemaphore(value: 0)) })
+    }
 
     var calls: [EngineSettings] { lock.withLock { _calls } }
+
+    /// Let gated call n finish.
+    func release(_ n: Int) { gates[n]?.signal() }
+
+    /// Wait until call n has started (and, if gated, is blocked).
+    func waitForCall(_ n: Int) async {
+        while calls.count <= n { try? await Task.sleep(for: .milliseconds(1)) }
+    }
 
     func render(_ input: URL, to output: URL, settings: EngineSettings, bypass: Bool, columnsPerSecond: Float) throws
         -> RenderResult
@@ -55,6 +69,7 @@ final class RecordingRenderer: ClipRenderer, @unchecked Sendable {
             return _calls.count - 1
         }
         if let d = delays[n] { Thread.sleep(forTimeInterval: d) }
+        gates[n]?.wait()
         if fail { throw CocoaError(.fileReadCorruptFile) }
         try writeWav(output, frames: 480)
         return RenderResult(
@@ -112,14 +127,15 @@ struct ReviewInspectorTests {
         m.windowClosed()
     }
 
-    @Test func staleRenderResultIsDropped() async throws {
-        // First render (after opening) is slow; an edit meanwhile starts a fast one.
-        let r = RecordingRenderer(delays: [0: 0.3])
+    @Test func staleRenderResultIsDropped() async {
+        // First render (after opening) is held; an edit meanwhile requests a newer one.
+        let r = RecordingRenderer(gated: [0])
         let (m, _, _, player) = make(r, debounce: .zero)
         m.open(clip)
         let stale = m.renderTask
-        try await Task.sleep(for: .milliseconds(50))
+        await r.waitForCall(0)
         m.set("desmack", "range", 6)
+        r.release(0)
         await m.waitUntilIdle()
         await stale?.value
         #expect(r.calls.count == 2)
@@ -142,14 +158,15 @@ struct ReviewInspectorTests {
     /// While a render runs (it can't be interrupted), later requests queue: one more render,
     /// with the newest settings, instead of one per request.
     @Test func onlyOneRenderRunsAtATime() async throws {
-        let r = RecordingRenderer(delays: [0: 0.3])
+        let r = RecordingRenderer(gated: [0])
         let (m, _, _, _) = make(r, debounce: .milliseconds(5))
         m.open(clip)
-        try await Task.sleep(for: .milliseconds(30))  // render 0 is running
+        await r.waitForCall(0)  // render 0 is running (held)
         for v in stride(from: Float(1), through: 5, by: 1) {
             m.set("deess", "range", v)
             try await Task.sleep(for: .milliseconds(20))  // each past the debounce
         }
+        r.release(0)
         await m.waitUntilIdle()
         #expect(r.calls.count == 2)
         #expect(r.calls.last?.module("deess")?.value("range") == 5, "the newest request wins")

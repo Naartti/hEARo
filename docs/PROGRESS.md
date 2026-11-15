@@ -165,10 +165,33 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
   - [ ] Stop-consonant test blind spot: measure per stop over burst + aspiration (released
         provisional ducks report no event); add weak-, decaying-aspiration and utterance-final
         stop variants (DSP review 2026-11-14; HEAD already ducks some weak-aspiration stops).
-  - [ ] Telemetry under bypass/warm-up (RT review 2026-11-14): trigger counters (popover count,
+  - [x] Telemetry under bypass/warm-up (RT review 2026-11-14): trigger counters (popover count,
         `.removing` glow) still count while globally bypassed; a slot warming up reports events
         for audio it didn't remove (could auto-save a spurious clip). Count published events in
         `RtState`; truncate events pushed by a `WarmingUp` slot.
+        Acceptance: under global bypass the trigger count, glow and reduction stand still; no
+        event is reported for audio a slot didn't remove. Done (2026-11-15): `RtState` publishes
+        trigger deltas only when not bypassed (reduction reads 0 then). Decision: the chain
+        filters by *when the audio leaves the slot*, not by state — a lookahead detector's
+        warm-up events are for audio leaving after warm-up (kept; de-smack in fact reports none
+        in its first ≈ 45 ms), while fading out it still detects audio that leaves after the
+        fade (measured: de-smack reported 9/10 smacks disabled 30 ms in, all 0 dB removed).
+        Both states now drop and uncount such events (`TelemetryWriter::retain_events_since`).
+        Review fixes (same branch): warm-up's last chunk is all dry, so its events go too; a
+        block whose output was replaced after a fault reports no events.
+  - [ ] Event timing at toggle boundaries (follow-ups from the item above and its RT + general
+        reviews, 2026-11-15). All need events held until their audio has played, then judged
+        by the slot/bypass state at that time:
+        - events reported while `On` for audio still in the lookahead at disable (≤ 40 ms for
+          de-smack), or during a warm-up that is then cancelled, are already published;
+        - re-enabling during a fade-out keeps that audio processed, but its events were dropped;
+        - global bypass is judged by the target at publish time, not when the audio plays (≤
+          chain latency early/late; the 10 ms bypass fade counts as fully bypassed);
+        - events past the 256-slot buffer can't be uncounted (documented on
+          `retain_events_since`); triggers also count events the full ring drops.
+        Rejected: caching `Slot::latency` duplicates `latency_samples()` — latency is fixed
+        between `prepare`s (the dry delay is sized from it too), so the cache is the right
+        source for the audio-thread filter.
   - [ ] Auto-save follow-ups (reviews 2026-11-14): surface `skipped_by_cap` and dropped events in
         status; snapshot/preview tests for the new visual states; clip cutting assumes the
         chain's clock never stalls (it doesn't advance on its fault path).

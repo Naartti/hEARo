@@ -132,8 +132,9 @@ const PARAMS: [ParamDesc; 4] = [
     // positives, 37 smacks found): 22 dB → 81 / 37, 18 → 66 / 35, 15 → 53 / 35, 12 → 35 / 33.
     // 22 dB is the strictest value that still finds every smack the ungated detector found (the
     // human's bar: fewer false positives, at least as many smacks); the gate never adds a catch.
-    // Re-checked 2026-11-15 on 230 reviewed clips with the speech hold (smacks found of 92 /
-    // false positives): 22 dB → 63 / 218, 20 → 62 / 214, 18 → 60 / 198 — still 22.
+    // Re-checked 2026-11-15 on 230 reviewed clips (with a speech-tracker hold since replaced by
+    // the restore; smacks found of 92 / false positives): 22 dB → 63 / 218, 20 → 62 / 214,
+    // 18 → 60 / 198 — still 22.
     // 48 dB ≈ off for any realistic level.
     ParamDesc {
         key: "below_speech",
@@ -176,8 +177,10 @@ struct Smack {
     /// Linear gain at the bottom of the duck.
     gain: f32,
     reported: bool,
-    /// Speech reference when the burst started (the burst itself mustn't lift it).
+    /// Speech reference and its envelope when the burst started (the burst itself mustn't lift
+    /// them; restored when it is confirmed as a smack).
     speech: f32,
+    sp_env: f32,
     /// Summed HF (> 1.5 kHz) and broadband power over the burst (while Open).
     sum_hf: f32,
     sum_bb: f32,
@@ -339,16 +342,13 @@ impl DeSmack {
         self.e_hf_q += self.a_q * (hf_p - self.e_hf_q);
         let loud = (x.abs() + sd.abs()) * (x.abs() + sd.abs()); // = max(L², R²): depth uses the louder channel
         self.e_bb += self.a_fast * (loud - self.e_bb);
-        // The speech reference holds while a burst is being judged: a loud smack mustn't lift it
-        // (≈ 3 dB) and so make the next smack in a cluster look less salient (DSP review
-        // 2026-11-15). A burst that turns out to be speech costs the tracker ≤ 80 ms of attack
-        // (MAX_LEN + 2·QUIET_AFTER; every event leaves Open/Decayed within that).
-        if !self.events.iter().flatten().any(|e| e.phase != Phase::Closed) {
-            self.sp_env += self.a_sp_env * (bb_p - self.sp_env);
-            let a = if self.sp_env > self.speech { self.a_sp_att } else { self.a_sp_rel };
-            self.speech += a * (self.sp_env - self.speech);
-        }
+        self.sp_env += self.a_sp_env * (bb_p - self.sp_env);
+        let a = if self.sp_env > self.speech { self.a_sp_att } else { self.a_sp_rel };
+        self.speech += a * (self.sp_env - self.speech);
 
+        // A burst that stayed quiet afterwards hands the speech reference back as it was at its
+        // onset (below).
+        let mut restore: Option<(f32, f32)> = None;
         let mut busy = false;
         let (quiet_after, range_db, pre) = (self.quiet_after, self.range_db, self.pre);
         let (e_hf, e_bb, max_len, out_pos) =
@@ -429,6 +429,11 @@ impl DeSmack {
                             ev.quiet_from = i;
                         }
                         if i - ev.quiet_from >= quiet_after {
+                            // It stayed quiet, so it wasn't speech — salient or not, its energy
+                            // mustn't lift the speech reference.
+                            restore = Some(
+                                restore.map_or((ev.speech, ev.sp_env), |(s, e)| (s.min(ev.speech), e.min(ev.sp_env))),
+                            );
                             // A smack in a pause. Duck it to about the pause level, within range.
                             let reduction = (pow_to_db(ev.peak_bb) - pow_to_db(ev.bg) - TARGET_ABOVE_BG_DB).max(0.0);
                             if ev.duck_from == u64::MAX
@@ -455,6 +460,14 @@ impl DeSmack {
                 // Removed in `process` once the gain loop has rendered its release.
                 Phase::Closed => {}
             }
+        }
+        // The smack's own energy lifted the speech reference ≈ 2 dB, which would make the next
+        // smack in a cluster look less salient (DSP review 2026-11-15). Take it back out once the
+        // burst has stayed quiet (a smack, or a dull/quiet burst the gate let go). Bursts that
+        // turn out to be speech keep feeding the tracker, so word onsets are never skipped.
+        if let Some((speech, sp_env)) = restore {
+            self.speech = self.speech.min(speech);
+            self.sp_env = self.sp_env.min(sp_env);
         }
 
         // Background: the pause floor. Grows slowly (clamped) so a burst can't lift it, and is
@@ -507,6 +520,7 @@ impl DeSmack {
                     gain: 1.0,
                     reported: false,
                     speech: self.speech,
+                    sp_env: self.sp_env,
                     sum_hf: 0.0,
                     sum_bb: 0.0,
                 });
@@ -746,11 +760,6 @@ mod tests {
         (m, speech + pause)
     }
 
-    /// Whether any event got as far as a duck (i.e. was judged a smack).
-    fn ducked(m: &DeSmack) -> bool {
-        m.events.iter().flatten().any(|e| e.duck_from != u64::MAX)
-    }
-
     /// A loud, bright 10 ms burst (louder than the speech) from `at`, dying away into the pause.
     fn loud_smack(m: &mut DeSmack, sr: f32, at: usize, tail_s: f32) {
         let len = (0.010 * sr) as usize;
@@ -762,14 +771,61 @@ mod tests {
     }
 
     #[test]
-    fn speech_reference_holds_while_a_burst_is_judged() {
+    fn a_confirmed_smack_leaves_the_speech_reference_where_it_was() {
         for sr in [44_100.0, 48_000.0, 96_000.0] {
             let (mut m, at) = after_speech_and_pause(sr, 0.1);
             let before = pow_to_db(m.speech);
-            loud_smack(&mut m, sr, at, 0.03);
+            loud_smack(&mut m, sr, at, 0.1); // long enough to be judged and confirmed
             let after = pow_to_db(m.speech);
-            assert!(ducked(&m), "{sr}: the burst is a smack");
+            assert!(m.events.iter().flatten().any(|e| e.phase == Phase::Closed && e.duck_from != u64::MAX));
             assert!((after - before).abs() < 0.5, "{sr}: speech reference moved {before:.1} → {after:.1} dB");
+        }
+    }
+
+    /// Two smacks in one pause; the second peaks just inside *below speech* (22 dB) under the
+    /// speech level. Both must be ducked: the first mustn't raise the bar.
+    #[test]
+    fn a_loud_smack_does_not_raise_the_bar_for_the_next() {
+        for sr in [44_100.0, 48_000.0, 96_000.0] {
+            let (mut m, at) = after_speech_and_pause(sr, 0.1);
+            loud_smack(&mut m, sr, at, 0.06);
+            let first = m.events.iter().flatten().filter(|e| e.duck_from != u64::MAX).count();
+            let second_at = at + ((0.010 + 0.06) * sr) as usize;
+            let len = (0.010 * sr) as usize;
+            for k in 0..len + (0.1 * sr) as usize {
+                let i = second_at + k;
+                // 0.012: just inside the gate with the reference restored, outside if the first
+                // smack had lifted it (0.010 fails either way, 0.015 passes either way).
+                let a = if k < len { 0.012 * (1.0 - k as f32 / len as f32) } else { 3e-4 };
+                m.detect(a * noise(i) * if i.is_multiple_of(2) { 1.0 } else { -1.0 }, 0.0);
+            }
+            let ducks = m.events.iter().flatten().filter(|e| e.duck_from != u64::MAX).count();
+            assert_eq!((first, ducks), (1, 2), "{sr}: both smacks ducked");
+        }
+    }
+
+    /// A loud *dull* burst (a thump: fails the brightness gate, so it isn't ducked) mustn't
+    /// raise the bar for a bright smack right after it either.
+    #[test]
+    fn a_dull_burst_does_not_raise_the_bar_for_the_next_smack() {
+        for sr in [44_100.0, 48_000.0, 96_000.0] {
+            let (mut m, at) = after_speech_and_pause(sr, 0.1);
+            let len = (0.010 * sr) as usize;
+            let thump_end = at + len + (0.06 * sr) as usize;
+            for i in at..thump_end {
+                let k = i - at;
+                let a = if k < len { 0.5 * (1.0 - k as f32 / len as f32) } else { 0.0 };
+                let t = k as f32 / sr;
+                m.detect(a * (2.0 * std::f32::consts::PI * 150.0 * t).sin() + 3e-4 * noise(i), 0.0);
+            }
+            assert!(m.events.iter().flatten().all(|e| e.duck_from == u64::MAX), "{sr}: the thump isn't ducked");
+            for k in 0..len + (0.1 * sr) as usize {
+                let i = thump_end + k;
+                let a = if k < len { 0.012 * (1.0 - k as f32 / len as f32) } else { 3e-4 };
+                m.detect(a * noise(i) * if i.is_multiple_of(2) { 1.0 } else { -1.0 }, 0.0);
+            }
+            let ducks = m.events.iter().flatten().filter(|e| e.duck_from != u64::MAX).count();
+            assert_eq!(ducks, 1, "{sr}: the smack after the thump is ducked");
         }
     }
 

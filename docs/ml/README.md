@@ -22,6 +22,7 @@ and snapshots carry the real speakers, mics, rooms and codecs hEARo will process
 - **Reviewed = exhaustive**: before marking a clip reviewed, mark *every* mouth noise in its
   8 s, not just the one you pressed for. Then everything unmarked is a negative, and no separate
   negative labelling is needed. Clips you didn't go through fully are test-only or skipped.
+  The Review tab says this under its Reviewed toggle ("Mark every mouth noise first").
 - Mark overlapped smacks (under speech or noise) too, even if messy: they are the honest test
   of the overlap case.
 

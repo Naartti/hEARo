@@ -356,8 +356,11 @@ See docs/HANDOVER.md §14; tasks get broken out here when the milestone starts.
 - [x] M7 dataset plan (human request 2026-11-14): build it from hotkey snapshots over days of
       normal use instead of a guided recording session; "reviewed" = every event marked, so
       unmarked audio is the negative set; mix clean events from training days; split by day.
-      ADR 0017, docs/ml/README.md. Follow-up for M6: make "reviewed = exhaustive" visible in
-      the Review tab (hint text near the Reviewed toggle).
+      ADR 0017, docs/ml/README.md.
+  - [x] Follow-up for M6: make "reviewed = exhaustive" visible in the Review tab (hint text
+        near the Reviewed toggle). Done 2026-11-15: caption under the toggle ("Mark every mouth
+        noise first" / "Every mouth noise marked"), full explanation as tooltip and VoiceOver
+        hint (`ReviewedHint`); DESIGN.md *Review* deviations.
 - [x] **Auto-save de-smack catches** (human request 2026-11-14). Done: event ring off the audio
   thread, `autocapture` policy + `save_auto`/expiry, FFI settings + status counters, Settings
   section + orange ear, Review A/X with `rejected` (ADR 0018, DESIGN *Auto-saved de-smack

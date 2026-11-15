@@ -399,6 +399,12 @@ Deviations / not yet done:
 
 - **Return marks the clip reviewed and opens the next one** (fast flow); the "Reviewed"
   toggle in the header undoes it.
+- **Reviewed = exhaustive, said in the UI (2026-11-15, ADR 0017):** a caption under the
+  Reviewed toggle reads *Mark every mouth noise first* (then *Every mouth noise marked*); its
+  tooltip and VoiceOver hint explain why — unmarked audio becomes clean training data — and
+  name Return (`ReviewedHint`). A caption rather than an alert or a check on Return: the fast
+  flow stays one key, and the promise is visible where the decision is made. The caption is
+  hidden from VoiceOver, which hears the full hint on the toggle instead.
 - Region classes are stored snake_case (`lip_smack`, `mouth_click`, `plosive`, `breath`,
   `filled_pause`, `other`), matching the `hearo dataset` proposal spelling.
 - Processed A/B is **B** (a toggle at the same position), not ⌥Space as first sketched.

@@ -302,11 +302,20 @@ struct DetailHeader: View {
             .toggleStyle(.button)
             .labelStyle(.iconOnly)
             .help("Show the spectrogram under the waveform (⇧⌘S)")
-            Toggle(isOn: Binding(get: { annotation.reviewed }, set: { model.setReviewed($0) })) {
-                Label("Reviewed", systemImage: "checkmark.circle")
+            VStack(spacing: 2) {
+                Toggle(isOn: Binding(get: { annotation.reviewed }, set: { model.setReviewed($0) })) {
+                    Label("Reviewed", systemImage: "checkmark.circle")
+                }
+                .toggleStyle(.button)
+                .help(ReviewedHint.explanation)
+                .accessibilityHint(ReviewedHint.explanation)
+                // The caption repeats the hint for sighted users; VoiceOver hears the full one.
+                Text(ReviewedHint.caption(reviewed: annotation.reviewed))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize()
+                    .accessibilityHidden(true)
             }
-            .toggleStyle(.button)
-            .help("Return marks reviewed and opens the next clip")
             Button("Move to Trash", systemImage: "trash", role: .destructive) { model.deleteCurrentClip() }
                 .labelStyle(.iconOnly)
                 .help("Remove this clip from the dataset (⌘⌫). It goes to the Trash, and importing won't bring it back.")
@@ -320,6 +329,18 @@ struct DetailHeader: View {
             }
         }
     }
+}
+
+/// What marking a clip reviewed promises (ADR 0017, docs/ml/README.md): every mouth noise in it
+/// is marked, so all unmarked audio is used as negative training data. Shown next to the header's
+/// Reviewed toggle (caption), as its tooltip and as its VoiceOver hint.
+enum ReviewedHint {
+    static func caption(reviewed: Bool) -> String {
+        reviewed ? "Every mouth noise marked" : "Mark every mouth noise first"
+    }
+
+    static let explanation =
+        "Reviewed means every mouth noise in this clip is marked: unmarked audio is used as clean training data. Return marks reviewed and opens the next clip."
 }
 
 struct SelectionBar: View {

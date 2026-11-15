@@ -554,3 +554,20 @@ struct ReviewModelTests {
         #expect(m.errorMessage?.contains("snapshot-5-missed") == true)
     }
 }
+
+/// "Reviewed" is a promise (ADR 0017): every mouth noise in the clip is marked, so all unmarked
+/// audio becomes negative training data. The Review header says so next to the toggle.
+struct ReviewedHintTests {
+    @Test func captionAsksForEveryMouthNoiseUntilReviewed() {
+        #expect(ReviewedHint.caption(reviewed: false) == "Mark every mouth noise first")
+        #expect(ReviewedHint.caption(reviewed: true) == "Every mouth noise marked")
+    }
+
+    @Test func explanationSaysUnmarkedAudioIsTrainingDataAndNamesReturn() {
+        let text = ReviewedHint.explanation
+        #expect(text.contains("every mouth noise"))
+        #expect(text.contains("unmarked"))
+        #expect(text.contains("training"))
+        #expect(text.contains("Return"))
+    }
+}

@@ -98,7 +98,7 @@ are ignored and noted under *Dependency notes* in PROGRESS.md.
   `just check` and `just app`)
 - `just app` / `just run`  build (SwiftPM), sign with stable identity, install
   `~/Applications/hEARo.app` (one app for debug and release, docs/dev/SIGNING.md), run it
-  (`run` streams `dev.hearo` logs; the app adds its os_log logger in M3)
+  (`run` streams `io.github.naartti.hearo` logs; the app adds its os_log logger in M3)
 - `just xcode`  optional: generate + open the Xcode project
 
 ## Map

@@ -11,6 +11,8 @@ struct HearoApp: App {
     @State private var review: ReviewModel
 
     init() {
+        // Preferences saved under the old bundle id (dev.hearo.app) carry over once.
+        DefaultsMigration.runForApp()
         // Module settings (amounts, advanced parameters, on/off) persist in
         // ~/Library/Application Support/hEARo/settings.json and are applied before starting.
         let model = AppModel(

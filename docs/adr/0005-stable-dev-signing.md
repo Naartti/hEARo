@@ -19,6 +19,12 @@ one app, `hEARo` (`dev.hearo.app`), installed at `~/Applications/hEARo.app` by
 `scripts/install-app.sh` (one copy per Mac; see docs/dev/SIGNING.md). The stable-identity rule is
 unchanged.
 
+**Amendment (2026-11-15):** the owner didn't want the `dev` prefix (it implies owning
+`hearo.dev`). The bundle ID is now `io.github.naartti.hearo`: reverse DNS of the GitHub Pages
+namespace the owner controls, the usual choice for an open-source project without its own
+domain. Users re-grant System Audio Recording once; preferences are copied from the old ID at
+first launch. If the project gets its own domain, rename again the same way.
+
 ## Alternatives considered
 
 - **Ad-hoc + re-grant every build** — silent failures (taps return zeros), awful loop.

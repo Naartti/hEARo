@@ -97,7 +97,7 @@ app:
 # `just app`, then launch and stream logs
 run: app
     open "$HOME/Applications/hEARo.app"
-    log stream --style compact --predicate 'subsystem == "dev.hearo"'
+    log stream --style compact --predicate 'subsystem == "io.github.naartti.hearo"'
 
 # Render the app icon (app/Resources/Icon/*.svg) → target/icon/hEARo.icns + .iconset PNGs
 icon:
@@ -111,7 +111,7 @@ xcode:
 
 # ── Release ──────────────────────────────────────────────────────────────────
 
-# Release build (bundle id dev.hearo.app) → sign → DMG in dist/ (unnotarized; docs/user/INSTALL.md)
+# Release build (bundle id io.github.naartti.hearo) → sign → DMG in dist/ (unnotarized; docs/user/INSTALL.md)
 release:
     scripts/build-app.sh release
     scripts/package-dmg.sh

@@ -23,7 +23,7 @@ old, expired WWDR cert from a previous Xcode is all that's installed). Install
 
 ## One app, one copy
 
-Every build is the same app: **hEARo**, bundle ID `dev.hearo.app`, installed at
+Every build is the same app: **hEARo**, bundle ID `io.github.naartti.hearo`, installed at
 `~/Applications/hEARo.app`. Debug and release differ only in build configuration (the About
 panel shows "· debug" and the git hash for `just app` builds), never in name, so the System
 Audio Recording permission and the login item belong to one app.
@@ -40,6 +40,13 @@ Audio Recording permission and the login item belong to one app.
 
 The fixed bundle ID, path and identity keep the permission across rebuilds. Ad-hoc only with
 `ALLOW_ADHOC=1` (expect re-prompts).
+
+**Migrating from `dev.hearo.app`** (builds before 2026-11-15): run `just app` (or install the
+new release), allow **System Audio Recording** again when asked, and re-enable *Launch at
+login* if you used it — both belong to the bundle ID. Preferences (auto-save, Review options,
+window positions) are copied once from the old ID at launch (`DefaultsMigration`); module
+settings live in `settings.json` and need nothing. Optionally remove the stale entry in System
+Settings → Privacy & Security.
 
 **Migrating from "hEARo Dev"** (builds before 2026-11-14 used `dev.hearo.app.dev`): quit
 *hEARo Dev*, delete `~/Applications/hEARo Dev.app`, run `just app`, allow **System Audio

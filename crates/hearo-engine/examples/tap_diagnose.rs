@@ -55,10 +55,10 @@ fn main() {
 
     println!("IO tests:");
     run("plain output device", out.id);
-    let a = Aggregate::create("diag-bogus", "dev.hearo.diag.bogus", &out.uid, "no-such-tap").unwrap();
+    let a = Aggregate::create("diag-bogus", "io.github.naartti.hearo.diag.bogus", &out.uid, "no-such-tap").unwrap();
     run("aggregate + bogus tap", a.id());
     drop(a);
-    let a = Aggregate::create("diag-real", "dev.hearo.diag.real", &out.uid, t.uid()).unwrap();
+    let a = Aggregate::create("diag-real", "io.github.naartti.hearo.diag.real", &out.uid, t.uid()).unwrap();
     let agg = device::info(a.id()).unwrap();
     println!(
         "  (aggregate opened @ {} Hz, buffer {}, {} input streams)",
@@ -72,6 +72,6 @@ fn main() {
     if let Ok(f) = get::<AudioStreamBasicDescription>(t.id(), kAudioTapPropertyFormat, GLOBAL) {
         println!("device-stream tap format: {} Hz, {} ch", f.mSampleRate, f.mChannelsPerFrame);
     }
-    let a = Aggregate::create("diag-dev", "dev.hearo.diag.dev", &out.uid, t.uid()).unwrap();
+    let a = Aggregate::create("diag-dev", "io.github.naartti.hearo.diag.dev", &out.uid, t.uid()).unwrap();
     run("aggregate + real tap (device stream)", a.id());
 }

@@ -157,7 +157,7 @@ impl LiveEngine {
 
         let tap = Tap::global_excluding(&exclude_ids, "hEARo")?;
         let tap_excluded = exclude_ids;
-        let uid = format!("dev.hearo.aggregate.{me}.{}", tap.id());
+        let uid = format!("{}.aggregate.{me}.{}", crate::BUNDLE_ID, tap.id());
         let aggregate = Aggregate::create("hEARo", &uid, &output.uid, tap.uid())?;
         if config.buffer_frames > 0 {
             // `buffer_frames` is specified at 48 kHz; scale so the buffer is the same *duration* at

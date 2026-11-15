@@ -35,6 +35,9 @@ pub use engine::{EngineConfig, EngineError, LiveEngine, RunInfo, scaled_buffer_f
 pub use events::EventRing;
 pub use stats::{Stats, StatsSnapshot};
 
+/// The app's bundle id; also the prefix of the private aggregate device UIDs hEARo creates.
+pub const BUNDLE_ID: &str = "io.github.naartti.hearo";
+
 /// Bundle-ID prefixes excluded from processing by default: music players and DAWs (§13.3).
 pub const DEFAULT_EXCLUDES: &[&str] = &[
     "com.apple.Music",

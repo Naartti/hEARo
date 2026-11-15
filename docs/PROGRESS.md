@@ -2,12 +2,17 @@
 
 The resume point for any session. Tick tasks as they land; add a one-line note per task.
 
-**Current milestone:** M4 — DSP modules (M1 done; M2/M3 wait for the
-signing identity, H1).
-**Now:** de-smack listening test (human). **Done first (re-prioritised by H2 feedback):** lip-smack removal — a pause-aware mouth-click /
-lip-smack module (M4 de-click, extended to 5–30 ms smacks), tuned on synthetic smacks + the
-human's captured snapshots (H4 early). Then M2 device-change rebuild + watchdog + FakeBackend,
-M3 bridge, de-hum rework.
+**Current milestone:** M4 — DSP modules (M0–M3 done apart from listed leftovers).
+**Now (owner's plan, 2026-11-15)** — one PR each, in order:
+
+1. Record the owner's answers (H1/H3/H5) + bundle ID `io.github.naartti.hearo`.
+2. Popover / Controls tab CPU (≈ 40 % of a core while open).
+3. Trustworthy training data: sidecars record enabled modules + live params, `dataset eval`
+   uses them; investigate the 11 `missed` snapshots; de-smack DSP review follow-ups.
+4. M6 as far as training needs: delete with undo, processed A/B in Review, a training export.
+
+Then M7/M8 (ML detector). DSP leftovers that need lookahead or measurement (de-ess fast "s",
+de-click targets) wait for the ML stage. Human: H3 tuning, H4 capture (docs/OPEN_QUESTIONS.md).
 
 Terminology (for docs/UI): *filled pause* = "uhm/öh" filler; *lip smack* = lips unsticking after a pause (sharp, bright, 5–30 ms);
 *mouth/tongue click* = tiny tick < 5 ms; *plosive* = low "p/b" air thump; *wet mouth noise* =
@@ -161,7 +166,8 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
   - [x] Loud smack with a slow tail missed (human demo recording, 2026-11-14): explain why.
         Cause: its tail took 120 ms to settle, past the 60 ms limit. A fix was built, then
         rejected in DSP review (ducks word-final/weak-aspiration stops; deep dive 06). Docs only;
-        real fix needs more lookahead (H3) or the ML stage.
+        real fix needs more lookahead (H3) or the ML stage. **Decided 2026-11-15 (owner, H3 a):**
+        keep ≈ 43–50 ms latency; the ML stage handles these.
   - [ ] Stop-consonant test blind spot: measure per stop over burst + aspiration (released
         provisional ducks report no event); add weak-, decaying-aspiration and utterance-final
         stop variants (DSP review 2026-11-14; HEAD already ducks some weak-aspiration stops).
@@ -340,8 +346,11 @@ warm `just check` ≈ 4 s, cold `just ci` 76 s.
   - [x] History squashed to one anonymous initial commit (2026-11-14, owner's request): author
         `naartti` with a GitHub noreply address; old history, tags `m0-done`/`m1-done` and
         reflogs removed. `.github/CODEOWNERS` → @naartti.
-  - [ ] Owner: check the `dev.hearo` bundle-id prefix. (`repository` set in Cargo.toml and
-        inherited by every crate, 2026-11-14.)
+  - [x] Owner: check the `dev.hearo` bundle-id prefix. Done 2026-11-15: "we don't want dev" →
+        `io.github.naartti.hearo` (ADR 0005 amendment; `hearo_engine::BUNDLE_ID` also prefixes
+        the aggregate UIDs). Acceptance: no `dev.hearo` left outside history docs; preferences
+        copied once from the old ID (`DefaultsMigration`, 3 tests); CHANGELOG says to re-grant
+        System Audio Recording and Launch at login.
   - [ ] Proposals: move HANDOVER/PROGRESS/OPEN_QUESTIONS to docs/project/; crates inherit
         authors/repository once a URL exists; ARCHITECTURE crate table misses hearo-bindgen.
 - [ ] **Proper open-source project on GitHub (human request, 2026-11-14):** "looks like and

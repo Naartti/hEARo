@@ -13,7 +13,7 @@ description: Playbook for debugging hEARo live audio - no sound, silence, glitch
    whether plain/aggregate/tap IO actually runs. Check
    System Settings → Privacy & Security → Screen & System Audio Recording. Ad-hoc builds lose
    the grant on every rebuild — `just doctor` must show a stable signing identity.
-3. **Logs:** `log stream --style compact --predicate 'subsystem == "dev.hearo"'`.
+3. **Logs:** `log stream --style compact --predicate 'subsystem == "io.github.naartti.hearo"'`.
 4. **Silence / zero buffers after a while?** The app's supervisor (ADR 0014) rebuilds tap +
    aggregate when tapped apps report running output (`just cli procs`) but the IOProc gets no
    callbacks for 2 s, and gives up after two tries (popover shows the problem; audio plays

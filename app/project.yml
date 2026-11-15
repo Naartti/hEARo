@@ -3,7 +3,7 @@
 # The generated .xcodeproj is git-ignored; never edit it by hand.
 name: hEARo
 options:
-  bundleIdPrefix: dev.hearo
+  bundleIdPrefix: io.github.naartti
   deploymentTarget:
     macOS: "26.0"
   createIntermediateGroups: true
@@ -34,7 +34,7 @@ targets:
     # rendered by `just icon` and bundled only by scripts/build-app.sh, not by this target.
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.hearo.app
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.naartti.hearo
         PRODUCT_NAME: hEARo
 schemes:
   hEARo:

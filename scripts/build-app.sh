@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build the menu bar app with SwiftPM (works with Command Line Tools alone), assemble the .app
 # bundle (Info.plist, icon), sign it with the stable identity and install it to a fixed path
-# (§3.5, §16.2). One identity for every build: "hEARo", bundle id dev.hearo.app, so the System
+# (§3.5, §16.2). One identity for every build: "hEARo", bundle id io.github.naartti.hearo, so the System
 # Audio Recording permission and the login item are shared (docs/dev/SIGNING.md).
 #
 # Usage: scripts/build-app.sh [debug|release]

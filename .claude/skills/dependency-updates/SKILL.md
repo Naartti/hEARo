@@ -30,8 +30,17 @@ majors. Merge one PR at a time; Dependabot rebases the rest.
 ## 2. Classify each PR
 
 **A — merge after checks.** The diff only touches manifests, lockfiles or workflow `uses:` pins,
-and it is: the `actions` group, the `cargo-patch-minor` group, the `uv` group, or a security
-update of a patch/minor version. Checks:
+and it is a grouped (`actions`, `cargo-patch-minor`, `uv`) or security update where **every**
+bumped dependency is semver-compatible. Check each line of the PR's version table, not the
+group name:
+
+- `x.y.z → x.y'.z'` with `x ≥ 1`: compatible. Any major change: class B.
+- `0.y.z → 0.y'.z`: a **breaking** change in semver for 0.x (Cargo treats it so too) — class B,
+  even though Dependabot calls it "minor". `0.y.z → 0.y.z'` is compatible.
+- A crate an ADR is built on (`uniffi*`, `objc2*`, `tract*`/`ort*`, `hound`, `realfft`) at any
+  non-patch bump: class B, and "Stop and ask" if it changes that ADR's decision.
+
+Then:
 
 - Hosted checks green (`gh pr checks <n>`). `just ci` is required; `coverage` red only blocks
   if the failure is in the tests, not the Codecov upload.

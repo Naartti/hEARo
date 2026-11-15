@@ -170,6 +170,8 @@ pub fn run(args: &RunArgs) -> Result<()> {
     });
 
     let mut enabled: Vec<(String, bool)> = args.modules.iter().map(|k| (k.clone(), true)).collect();
+    // Validated by `build_modules` at start; parsed once for the snapshot sidecars.
+    let params: Vec<(String, String, f32)> = args.params.iter().map(|p| parse_param(p)).collect::<Result<_>>()?;
     let started = Instant::now();
     let mut prev = engine.stats().snapshot();
     let mut warned_silence = false;
@@ -184,7 +186,7 @@ pub fn run(args: &RunArgs) -> Result<()> {
         let presses = crate::hotkey::presses();
         if presses != seen_presses {
             seen_presses = presses;
-            snapshot_and_confirm(&engine, "missed", &args.modules, &live_settings(&enabled, &args.params), &mut saved);
+            snapshot_and_confirm(&engine, "missed", &args.modules, &live_settings(&enabled, &params), &mut saved);
         }
         if last_status.elapsed() < Duration::from_millis(500) {
             continue;
@@ -222,13 +224,7 @@ pub fn run(args: &RunArgs) -> Result<()> {
                 "b" => controls.set_bypass(!controls.bypass()),
                 "m" | "f" => {
                     let label = if cmd == "m" { "missed" } else { "false_hit" };
-                    snapshot_and_confirm(
-                        &engine,
-                        label,
-                        &args.modules,
-                        &live_settings(&enabled, &args.params),
-                        &mut saved,
-                    );
+                    snapshot_and_confirm(&engine, label, &args.modules, &live_settings(&enabled, &params), &mut saved);
                 }
                 n => {
                     if let Ok(i) = n.parse::<usize>()
@@ -342,8 +338,7 @@ fn save_snapshot(
 
 /// What `hearo run` is running, for a snapshot sidecar: each module's on/off toggle and the
 /// `--param` values (others are at their defaults). `params` were validated at start.
-fn live_settings(enabled: &[(String, bool)], params: &[String]) -> LiveSettings {
-    let parsed: Vec<(String, String, f32)> = params.iter().filter_map(|p| parse_param(p).ok()).collect();
+fn live_settings(enabled: &[(String, bool)], parsed: &[(String, String, f32)]) -> LiveSettings {
     LiveSettings {
         modules: enabled
             .iter()
@@ -367,7 +362,8 @@ mod tests {
     #[test]
     fn live_settings_record_toggles_and_params() {
         let enabled = [("desmack".to_string(), true), ("deess".to_string(), false)];
-        let s = live_settings(&enabled, &["desmack.below_speech=18".into(), "deess.range=6".into()]);
+        let params = [("desmack".into(), "below_speech".into(), 18.0), ("deess".into(), "range".into(), 6.0)];
+        let s = live_settings(&enabled, &params);
         assert!(s.is_enabled("desmack") && !s.is_enabled("deess"));
         assert_eq!(s.param("desmack", "below_speech"), Some(18.0));
         assert_eq!(s.param("deess", "range"), Some(6.0));

@@ -339,7 +339,7 @@ mod tests {
         let json = serde_json::to_string(&live).unwrap();
         assert_eq!(settings_from_json(json).unwrap(), st.settings());
         let side = serde_json::json!({ "settings": serde_json::from_str::<serde_json::Value>(&settings_to_json(st.settings())).unwrap() });
-        assert_eq!(hearo_engine::snapshots::LiveSettings::from_sidecar(&side), Some(live));
+        assert_eq!(hearo_engine::snapshots::LiveSettings::from_sidecar(&side), Some(Ok(live)));
     }
 
     #[test]

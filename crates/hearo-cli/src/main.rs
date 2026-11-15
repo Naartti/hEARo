@@ -81,6 +81,9 @@ pub(crate) fn parse_param(s: &str) -> Result<(String, String, f32)> {
     let (lhs, value) = s.split_once('=').context("expected module.param=value")?;
     let (module, param) = lhs.split_once('.').context("expected module.param=value")?;
     let value: f32 = value.trim().parse().with_context(|| format!("bad number in {s}"))?;
+    if !value.is_finite() {
+        bail!("{s}: the value must be a finite number");
+    }
     if module.is_empty() || param.is_empty() {
         bail!("expected module.param=value");
     }
@@ -96,6 +99,9 @@ mod tests {
         assert_eq!(parse_param("gain.gain=-6").unwrap(), ("gain".into(), "gain".into(), -6.0));
         assert!(parse_param("gain=-6").is_err());
         assert!(parse_param("gain.gain=x").is_err());
+        // NaN/inf would reach a module and be written to a sidecar as `null`.
+        assert!(parse_param("gain.gain=NaN").is_err());
+        assert!(parse_param("gain.gain=inf").is_err());
     }
 
     #[test]

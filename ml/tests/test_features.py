@@ -66,6 +66,13 @@ def test_other_detectors_rejections_are_not_hard_negatives():
     assert np.all(w[30:32] == 3.0) and np.all(w[60:62] == 1.0)
 
 
+def test_just_style_key_value_words_become_flags():
+    assert ds.cli_args(["RUN=ml/configs", "TEST=1"]) == ["--run", str(ds.REPO / "ml/configs"), "--test"]
+    assert ds.cli_args(["TEST=", "NO_DSP=0", "--runs", "x"]) == ["--runs", "x"]
+    assert ds.cli_args(["CONFIG=/abs/x.yaml"]) == ["--config", "/abs/x.yaml"]
+    assert ds.cli_args(["RUN=20261116-1-detector"]) == ["--run", "20261116-1-detector"]
+
+
 def test_cache_key_follows_codecs_and_synthetic_availability():
     cfg = ds.DataConfig()
     keys = {ds.cache_key("a", cfg, c, s) for c in (True, False) for s in (True, False)}

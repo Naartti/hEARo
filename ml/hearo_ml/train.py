@@ -233,11 +233,11 @@ def train(
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="hearo_ml.train", description=__doc__.splitlines()[0])
-    ap.add_argument("--config", type=Path, required=True)
+    ap.add_argument("--config", type=Path, default=ds.ML_DIR / "configs/detector.yaml")
     ap.add_argument("--manifest", type=Path, default=ds.ML_DIR / "data/processed/snapshots/manifest.jsonl")
     ap.add_argument("--data", type=Path, default=ds.ML_DIR / "data/processed/features")
     ap.add_argument("--runs", type=Path, default=ds.ML_DIR / "runs")
-    args = ap.parse_args(argv)
+    args = ap.parse_args(ds.cli_args(sys.argv[1:] if argv is None else argv))
     if not args.manifest.exists():
         print(f"✖ {args.manifest} missing: run `just ml-import-snapshots` first", file=sys.stderr)
         return 1

@@ -148,17 +148,20 @@ ml-check:
 ml-import-snapshots *ARGS:
     cd ml && uv run --frozen python -m hearo_ml.snapshots {{ARGS}}
 
+# Arguments below are `KEY=value` words (`just ml-train CONFIG=ml/configs/teacher.yaml`); paths
+# are from the repo root. Python turns them into flags (hearo_ml.train.cli_args).
+
 # Manifest → training/eval feature sets (mixes, codecs, synthetic; cached by manifest + data config)
-ml-data CONFIG="ml/configs/detector.yaml":
-    cd ml && uv run --frozen python -m hearo_ml.dataset --config ../{{CONFIG}}
+ml-data *ARGS:
+    cd ml && uv run --frozen python -m hearo_ml.dataset {{ARGS}}
 
-# Train a detector from a config → ml/runs/<timestamp>-<name>/ (builds the data first if needed)
-ml-train CONFIG="ml/configs/detector.yaml":
-    cd ml && uv run --frozen python -m hearo_ml.train --config ../{{CONFIG}}
+# Train a detector from CONFIG= (default ml/configs/detector.yaml) → ml/runs/<timestamp>-<name>/
+ml-train *ARGS:
+    cd ml && uv run --frozen python -m hearo_ml.train {{ARGS}}
 
-# Evaluate a run (default: the latest) vs the DSP de-smack → docs/ml/reports/<run>.md; TEST=1 also scores test
-ml-eval RUN="" TEST="":
-    cd ml && uv run --frozen python -m hearo_ml.evaluate {{ if RUN == "" { "" } else { "--run " + RUN } }} {{ if TEST == "" { "" } else { "--test" } }}
+# Evaluate RUN= (default: the latest) vs the DSP de-smack → docs/ml/reports/<run>.md; TEST=1 also scores test
+ml-eval *ARGS:
+    cd ml && uv run --frozen python -m hearo_ml.evaluate {{ARGS}}
 
 # New data arrived: re-import the snapshots, train every config in ml/configs/, report each (validation only)
 ml-retrain:
@@ -166,8 +169,8 @@ ml-retrain:
     set -euo pipefail
     just ml-import-snapshots
     for c in ml/configs/*.yaml; do
-        run=$(just ml-train "$c" | tee /dev/stderr | sed -n 's/^✔ run //p' | tail -1)
-        just ml-eval RUN="$run"
+        run=$(just ml-train "CONFIG=$c" | tee /dev/stderr | sed -n 's/^✔ run //p' | tail -1)
+        just ml-eval "RUN=$run"
     done
 
 # Export ONNX (M7)

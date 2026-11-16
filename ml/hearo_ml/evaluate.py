@@ -373,7 +373,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--reports", type=Path, default=ds.REPO / "docs/ml/reports")
     ap.add_argument("--no-dsp", action="store_true", help="skip the DSP baseline")
     ap.add_argument("--test", action="store_true", help="also score the test days (once a model is chosen)")
-    args = ap.parse_args(argv)
+    args = ap.parse_args(ds.cli_args(sys.argv[1:] if argv is None else argv))
     run = resolve_run(args.run, args.runs)
     if run is None or not (run / "model.pt").exists():
         print("✖ no finished run: train one with `just ml-train`", file=sys.stderr)

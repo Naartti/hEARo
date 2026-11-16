@@ -468,13 +468,39 @@ def config_from_dict(d: dict) -> DataConfig:
     return DataConfig(**tuples)
 
 
+#: `KEY=value` words that are on/off flags.
+_BOOL_KEYS = {"test", "no_dsp", "no_codecs"}
+
+
+def cli_args(argv: list[str]) -> list[str]:
+    """`just`-style `KEY=value` words → argparse flags (`CONFIG=x` → `--config x`, `TEST=1` →
+    `--test`, `TEST=` or `TEST=0` → nothing); other words pass through. A relative path that
+    only exists from the repo root (where `just` was called) is made absolute, since the
+    recipes run in `ml/`."""
+    out: list[str] = []
+    for a in argv:
+        key, eq, value = a.partition("=")
+        if not eq or a.startswith("-") or not key.replace("_", "").isalpha():
+            out.append(a)
+            continue
+        flag = key.lower().replace("-", "_")
+        if flag in _BOOL_KEYS:
+            if value.lower() not in ("", "0", "false", "no"):
+                out.append("--" + flag.replace("_", "-"))
+            continue
+        if value and not Path(value).is_absolute() and not Path(value).exists() and (REPO / value).exists():
+            value = str(REPO / value)
+        out += ["--" + flag.replace("_", "-"), value]
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="hearo_ml.dataset", description=__doc__.splitlines()[0])
     ap.add_argument("--manifest", type=Path, default=ML_DIR / "data/processed/snapshots/manifest.jsonl")
     ap.add_argument("--out", type=Path, default=ML_DIR / "data/processed/features")
     ap.add_argument("--config", type=Path, default=ML_DIR / "configs/detector.yaml", help="its `data` section")
     ap.add_argument("--no-codecs", action="store_true", help="skip ffmpeg round-trips")
-    args = ap.parse_args(argv)
+    args = ap.parse_args(cli_args(sys.argv[1:] if argv is None else argv))
     import yaml
 
     cfg = config_from_dict((yaml.safe_load(args.config.read_text()) or {}).get("data", {}))

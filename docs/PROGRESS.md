@@ -447,9 +447,20 @@ See docs/HANDOVER.md §14; tasks get broken out here when the milestone starts.
 - [x] M6 (early): snapshot review & annotation window — list, waveform with hint/proposals/
       regions, drag to create/move/resize, zoom/pan, 1–6 classes, Space plays the clip under
       the mouse (selection loops), ↑/↓, Return = reviewed + next; edits merged into the
-      sidecar preserving unknown keys. 25 Swift tests (model layer + ReviewModel). Not yet:
-      spectrogram, ⌥Space processed A/B, delete snapshot with undo (docs/DESIGN.md).
-      Needs a human click-through (gestures, keyboard focus, playback).
+      sidecar preserving unknown keys. 25 Swift tests (model layer + ReviewModel). Since
+      added: spectrogram, processed A/B (**B**), Move to Trash (⌘⌫) — docs/DESIGN.md. Human
+      click-through done (morning checklist, 2026-11-15: "nice, good shortcuts").
+- [x] **M6 for training: snapshot manifest (owner's plan step 4, 2026-11-15).** Acceptance:
+      one command turns the reviewed snapshots into a training manifest that applies ADR 0017
+      (by-day splits, auto clips never test data, mixing pool from training days only) and
+      refuses to write one that leaks; tested end to end. `just ml-import-snapshots`
+      (`ml/hearo_ml/snapshots.py`, stdlib only, 9 tests); docs/ml/README.md *Using it*. On
+      this Mac (2026-11-16): 3 days → 2 train (38 clips, 39 events) / 1 test (12 clips, 13
+      events); the 180 auto clips are all on the test day and drop out until more days
+      arrive; pool 4 events. Delete-with-undo and processed A/B already existed (stale
+      notes fixed in DESIGN.md).
+  - [ ] Pool is small (4): ADR 0017's "< 150 clean events after two weeks" check — revisit
+        when M7 starts; Freesound supplement if needed.
 
 ## Log
 

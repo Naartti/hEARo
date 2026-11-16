@@ -140,6 +140,10 @@ deny:
 ml-check:
     scripts/ml-check.sh
 
+# Reviewed snapshots → ml/data/processed/snapshots/{manifest,pool}.jsonl (by-day splits; local only)
+ml-import-snapshots *ARGS:
+    cd ml && uv run --frozen python -m hearo_ml.snapshots {{ARGS}}
+
 # Download/prepare datasets (M7)
 ml-data:
     @echo "Arrives in M7."

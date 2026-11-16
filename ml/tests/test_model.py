@@ -51,6 +51,10 @@ def test_predict_realigns_by_the_lookahead():
     with torch.no_grad():
         raw = torch.sigmoid(m(torch.as_tensor(x)[None]))[0].numpy()
     assert np.allclose(p[:30], raw[3:33])
+    padded = np.concatenate([x, np.full((3, 8), -100.0, dtype=np.float32)])
+    with torch.no_grad():
+        tail = torch.sigmoid(m(torch.as_tensor(padded)[None]))[0].numpy()
+    assert np.allclose(p, tail[3:]), "the last verdicts see the training crops' padding"
 
 
 def test_teacher_sees_the_future_and_refuses_to_stream():

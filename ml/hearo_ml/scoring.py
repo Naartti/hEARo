@@ -9,7 +9,10 @@ A reviewed clip is exhaustively labelled (ADR 0017), so:
   cold-started there; the model is held to the same window so the numbers compare).
 
 The DSP baseline is re-scored here from `hearo dataset eval --json`, so both sides run through
-this one function. `tests/test_scoring.py` mirrors the Rust unit tests.
+this one function. `tests/test_scoring.py` mirrors the Rust unit tests. One deliberate
+difference: detections less than `MERGE_GAP_S` apart are merged into one event on both sides
+(a model's frame runs break up; so can de-smack's), so per-split DSP counts can be slightly
+lower than `hearo dataset eval`'s.
 """
 
 from __future__ import annotations
@@ -80,7 +83,16 @@ class Score:
         return 60.0 * self.false_positives / self.seconds if self.seconds > 0 else None
 
 
-def labels_from_clip(regions: Iterable[dict], rejected: Iterable[dict]) -> Labels:
+#: The detector the model replaces: rejections of other modules' catches don't count.
+MODULE = "desmack"
+
+
+def is_own_rejection(r: dict, module: str = MODULE) -> bool:
+    """A rejected span of `module`'s catch, or one from a sidecar that didn't record it."""
+    return (r.get("module") or "") in ("", module)
+
+
+def labels_from_clip(regions: Iterable[dict], rejected: Iterable[dict], module: str = MODULE) -> Labels:
     """Labels from a manifest line's `regions` / `rejected`, minus those in the warm-up."""
 
     def keep(items: Iterable[dict], pred) -> tuple[Span, ...]:
@@ -90,8 +102,20 @@ def labels_from_clip(regions: Iterable[dict], rejected: Iterable[dict]) -> Label
     return Labels(
         targets=keep(regions, lambda r: r["cls"] in TARGET_CLASSES),
         neutral=keep(regions, lambda r: r["cls"] not in TARGET_CLASSES),
-        rejected=keep(rejected, lambda r: True),
+        rejected=keep(rejected, lambda r: is_own_rejection(r, module)),
     )
+
+
+def merge(spans: Iterable[Span], gap_s: float = MERGE_GAP_S) -> list[Span]:
+    """Spans closer than `gap_s` joined, in time order: how model runs become events, applied
+    to the DSP's detections too so both sides count events the same way."""
+    out: list[Span] = []
+    for s in sorted(spans, key=lambda s: s.start):
+        if out and s.start - out[-1].end < gap_s:
+            out[-1] = Span(out[-1].start, max(out[-1].end, s.end))
+        else:
+            out.append(s)
+    return out
 
 
 def score(detections: Sequence[Span], labels: Labels, seconds: float = 0.0) -> Score:
@@ -112,7 +136,7 @@ def score(detections: Sequence[Span], labels: Labels, seconds: float = 0.0) -> S
 def detections(probs: np.ndarray, threshold: float, hop_s: float, merge_gap_s: float = MERGE_GAP_S) -> list[Span]:
     """Runs of frames at or above `threshold` → spans (frame `t` = `[t, t + 1) * hop_s`)."""
     on = np.asarray(probs) >= threshold
-    out: list[Span] = []
+    runs: list[Span] = []
     t, n = 0, len(on)
     while t < n:
         if not on[t]:
@@ -121,12 +145,8 @@ def detections(probs: np.ndarray, threshold: float, hop_s: float, merge_gap_s: f
         start = t
         while t < n and on[t]:
             t += 1
-        span = Span(start * hop_s, t * hop_s)
-        if out and span.start - out[-1].end < merge_gap_s:
-            out[-1] = Span(out[-1].start, span.end)
-        else:
-            out.append(span)
-    return out
+        runs.append(Span(start * hop_s, t * hop_s))
+    return merge(runs, merge_gap_s)
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float] | None:

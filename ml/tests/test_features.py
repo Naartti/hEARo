@@ -57,6 +57,22 @@ def test_frame_targets_mark_events_and_skip_neutral_and_edges():
     assert w[30] == 1 and y[30] == 0
 
 
+def test_other_detectors_rejections_are_not_hard_negatives():
+    rejected = [
+        {"start_s": 0.3, "end_s": 0.32, "cls": "lip_smack", "module": "desmack"},
+        {"start_s": 0.6, "end_s": 0.62, "cls": "sibilance", "module": "deess"},
+    ]
+    _, w = ds.frame_targets(100, [], rejected, hard_negative_weight=3.0)
+    assert np.all(w[30:32] == 3.0) and np.all(w[60:62] == 1.0)
+
+
+def test_cache_key_follows_codecs_and_synthetic_availability():
+    cfg = ds.DataConfig()
+    keys = {ds.cache_key("a", cfg, c, s) for c in (True, False) for s in (True, False)}
+    assert len(keys) == 4
+    assert ds.cache_key("a", cfg) != ds.cache_key("b", cfg)
+
+
 def test_mix_adds_labelled_events_at_the_requested_level():
     rng = np.random.default_rng(1)
     bg = 0.05 * np.random.default_rng(2).standard_normal(8 * feat.SR).astype(np.float32)

@@ -29,7 +29,7 @@ import torch
 
 from hearo_ml import dataset as ds
 from hearo_ml.model import Detector
-from hearo_ml.scoring import Score, Span, score, wilson
+from hearo_ml.scoring import Score, Span, merge, score, wilson
 from hearo_ml.train import best_threshold, score_probs
 
 MIN_TEST_EVENTS = 50
@@ -46,14 +46,25 @@ def dsp_detections(hearo: list[str]) -> dict[str, list[Span]]:
     return res
 
 
-def score_dsp(dets: dict[str, list[Span]], items: list[ds.Item]) -> Score | None:
-    """The DSP baseline over `items` (None if any clip is missing from its output)."""
-    total = Score()
+def score_dsp(dets: dict[str, list[Span]], items: list[ds.Item]) -> tuple[Score, int]:
+    """The DSP baseline over `items` (merged like the model's runs), and how many clips its
+    output lacked (`hearo dataset eval` skips unreadable ones; they're left out here too)."""
+    total, missing = Score(), 0
     for it in items:
         if it.name not in dets:
-            return None
-        total.add(score(dets[it.name], it.labels, it.seconds))
-    return total
+            missing += 1
+            continue
+        total.add(score(merge(dets[it.name]), it.labels, it.seconds))
+    return total, missing
+
+
+def _baseline(dsp: dict[str, list[Span]] | None, items: list[ds.Item]) -> tuple[dict | None, int]:
+    """The DSP summary over `items` (None without a baseline or any scored clip), and how
+    many clips its output lacked."""
+    if dsp is None:
+        return None, 0
+    s, missing = score_dsp(dsp, items)
+    return (summary(s) if missing < len(items) else None), missing
 
 
 def summary(s: Score | None) -> dict | None:
@@ -97,17 +108,24 @@ def evaluate(run: Path, data_folder: Path, dsp: dict[str, list[Span]] | None) ->
         if split == "test" and val_events == 0:
             res["warnings"].append("validation has no events: test metrics withheld (no threshold to apply)")
             continue
+
+        dsp_all, missing = _baseline(dsp, items)
+        if missing:
+            res["warnings"].append(
+                f"{split}: {missing} clips missing from `hearo dataset eval --json` (unreadable there); "
+                "the DSP rows leave them out, the model rows don't"
+            )
         entry = {
             "clips": len(items),
             "model": summary(score_probs(probs[split], items, thr)),
-            "dsp": summary(score_dsp(dsp, items)) if dsp is not None else None,
+            "dsp": dsp_all,
         }
         auto = [it for it in items if it.auto]
         if auto:
             entry["auto_clips"] = {
                 "clips": len(auto),
                 "model": summary(score_probs(probs[split], auto, thr)),
-                "dsp": summary(score_dsp(dsp, auto)) if dsp is not None else None,
+                "dsp": _baseline(dsp, auto)[0],
             }
         res["splits"][split] = entry
         if split == "test" and entry["model"]["regions"] < MIN_TEST_EVENTS:
@@ -230,13 +248,15 @@ def report(res: dict, previous: dict | None) -> str:
     return "\n".join(lines)
 
 
-def previous_best(runs: Path, exclude: str, same_manifest: str | None = None) -> dict | None:
+def previous_best(runs: Path, exclude: str, manifest: str, name: str) -> dict | None:
+    """The best earlier run of the same config name on the same manifest (a teacher is no
+    baseline for the streaming detector, and other data isn't comparable)."""
     best, best_f1 = None, -1.0
     for p in runs.glob("*/metrics.json"):
         if p.parent.name == exclude:
             continue
         r = json.loads(p.read_text())
-        if same_manifest and r["meta"]["manifest_sha256"] != same_manifest:
+        if r["meta"]["manifest_sha256"] != manifest or r["meta"]["name"] != name:
             continue
         f1 = ((r["splits"].get("val") or {}).get("model") or {}).get("f1") or -1.0
         if f1 > best_f1:
@@ -247,7 +267,9 @@ def previous_best(runs: Path, exclude: str, same_manifest: str | None = None) ->
 def run_eval(run: Path, data_root: Path, reports: Path, dsp_source: Callable[[], dict] | None, log=print) -> Path:
     meta = json.loads((run / "meta.json").read_text())
     folder = data_root / meta["data_key"]
-    cache = run / "dsp.json"
+    # One DSP replay per manifest, shared by every config's run (a clip's audio and recorded
+    # settings never change; labels come from the run's data cache).
+    cache = data_root / f"dsp-{meta['manifest_sha256'][:16]}.json"
     dsp = None
     if cache.exists():
         dsp = {k: [Span(*s) for s in v] for k, v in json.loads(cache.read_text()).items()}
@@ -256,7 +278,7 @@ def run_eval(run: Path, data_root: Path, reports: Path, dsp_source: Callable[[],
         cache.write_text(json.dumps({k: [[s.start, s.end] for s in v] for k, v in dsp.items()}))
     res = evaluate(run, folder, dsp)
     (run / "metrics.json").write_text(json.dumps(res, indent=2, default=float) + "\n")
-    prev = previous_best(run.parent, run.name, meta["manifest_sha256"])
+    prev = previous_best(run.parent, run.name, meta["manifest_sha256"], meta["name"])
     reports.mkdir(parents=True, exist_ok=True)
     out = reports / f"{run.name}.md"
     out.write_text(report(res, prev))
@@ -269,6 +291,17 @@ def latest_run(runs: Path) -> Path | None:
     return done[-1] if done else None
 
 
+def resolve_run(arg: str, runs: Path) -> Path | None:
+    """`arg` as a path (as given, or from the repo root, since `just` runs this in `ml/`) or
+    a run name in `runs`; empty = the latest run."""
+    if not arg:
+        return latest_run(runs)
+    for p in (Path(arg), ds.REPO / arg, runs / arg):
+        if p.is_dir():
+            return p
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="hearo_ml.evaluate", description=__doc__.splitlines()[0])
     ap.add_argument("--run", type=str, default="", help="run folder or name (default: the latest)")
@@ -277,11 +310,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--reports", type=Path, default=ds.REPO / "docs/ml/reports")
     ap.add_argument("--no-dsp", action="store_true", help="skip the DSP baseline")
     args = ap.parse_args(argv)
-    run = (
-        Path(args.run)
-        if args.run and Path(args.run).is_dir()
-        else (args.runs / args.run if args.run else latest_run(args.runs))
-    )
+    run = resolve_run(args.run, args.runs)
     if run is None or not (run / "model.pt").exists():
         print("✖ no finished run: train one with `just ml-train`", file=sys.stderr)
         return 1

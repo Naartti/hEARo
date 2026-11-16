@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from hearo_ml.scoring import Labels, Score, Span, detections, labels_from_clip, score, wilson
+from hearo_ml.scoring import Labels, Score, Span, detections, labels_from_clip, merge, score, wilson
 
 
 def sp(a: float, b: float) -> Span:
@@ -36,6 +36,20 @@ def test_warmup_drops_early_labels_and_detections():
     assert labels.targets == () and labels.neutral == (sp(2.0, 2.05),) and labels.rejected == (sp(3.0, 3.1),)
     s = score([sp(0.1, 0.12)], labels, seconds=8.0)
     assert s.detections == 0 and s.seconds == pytest.approx(7.5)
+
+
+def test_rejections_count_only_for_their_own_detector():
+    rejected = [
+        {"start_s": 1.0, "end_s": 1.1, "cls": "lip_smack", "module": "desmack"},
+        {"start_s": 2.0, "end_s": 2.1, "cls": "sibilance", "module": "deess"},
+        {"start_s": 3.0, "end_s": 3.1, "cls": "rejected"},  # older sidecar, no module
+    ]
+    assert labels_from_clip([], rejected).rejected == (sp(1.0, 1.1), sp(3.0, 3.1))
+
+
+def test_merge_joins_close_spans_like_model_runs():
+    assert merge([sp(1.0, 1.01), sp(1.02, 1.03), sp(2.0, 2.01)]) == [sp(1.0, 1.03), sp(2.0, 2.01)]
+    assert merge([sp(2.0, 2.01), sp(1.0, 1.01)]) == [sp(1.0, 1.01), sp(2.0, 2.01)]
 
 
 def test_runs_of_frames_become_merged_spans():

@@ -23,6 +23,8 @@ import numpy as np
 import torch
 from torch import nn
 
+from hearo_ml.features import LOG_FLOOR_DB
+
 
 @dataclass(frozen=True)
 class DetectorConfig:
@@ -105,8 +107,9 @@ class Detector(nn.Module):
         dev = self.mean.device
         x = torch.as_tensor(feats, dtype=torch.float32, device=dev)
         if self.shift:
-            # The last frames' verdicts need `shift` more frames: feed quiet (the floor).
-            x = torch.cat([x, x.new_full((self.shift, x.shape[1]), float(feats.min()))])
+            # The last frames' verdicts need `shift` more frames: feed digital silence, the
+            # same padding training crops get past a clip's end.
+            x = torch.cat([x, x.new_full((self.shift, x.shape[1]), LOG_FLOOR_DB)])
         p = torch.sigmoid(self.forward(x[None]))[0]
         return p[self.shift :].cpu().numpy().astype(np.float32)
 

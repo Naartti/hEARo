@@ -38,7 +38,7 @@ import numpy as np
 from scipy.signal import lfilter
 
 from hearo_ml import features as feat
-from hearo_ml.scoring import TARGET_CLASSES, Labels, Span, labels_from_clip
+from hearo_ml.scoring import TARGET_CLASSES, Labels, Span, is_own_rejection, labels_from_clip
 
 #: Bump when a change here changes the built sets (it's part of the cache key).
 FORMAT = 1
@@ -103,7 +103,8 @@ def frame_targets(
     y = np.zeros(n, dtype=np.float32)
     w = np.ones(n, dtype=np.float32)
     for r in rejected:
-        w[list(_frames_of(n, r["start_s"], r["end_s"]))] = hard_negative_weight
+        if is_own_rejection(r):
+            w[list(_frames_of(n, r["start_s"], r["end_s"]))] = hard_negative_weight
     for r in regions:
         if r["cls"] in TARGET_CLASSES:
             continue
@@ -272,8 +273,19 @@ def synthetic(hearo: list[str], seed: int, secs: float, workdir: Path) -> list[t
     return res
 
 
-def cache_key(manifest_sha: str, cfg: DataConfig) -> str:
-    blob = json.dumps({"format": FORMAT, "manifest": manifest_sha, "cfg": asdict(cfg)}, sort_keys=True)
+def cache_key(manifest_sha: str, cfg: DataConfig, codecs: bool = True, synthetic: bool = True) -> str:
+    """Changes with anything that changes the sets, including whether ffmpeg (codec
+    round-trips) and the `hearo` CLI (synthetic signals) were there to use."""
+    blob = json.dumps(
+        {
+            "format": FORMAT,
+            "manifest": manifest_sha,
+            "cfg": asdict(cfg),
+            "codecs": codecs and bool(cfg.codecs),
+            "synthetic": synthetic,
+        },
+        sort_keys=True,
+    )
     return hashlib.sha256(blob.encode()).hexdigest()[:16]
 
 
@@ -288,7 +300,7 @@ def build(
     """Build (or reuse) the sets for `manifest`; returns the cache folder with `<split>.pkl`."""
     meta_path = manifest.parent / "meta.json"
     sha = json.loads(meta_path.read_text())["manifest_sha256"] if meta_path.exists() else _sha(manifest)
-    key = cache_key(sha, cfg)
+    key = cache_key(sha, cfg, codecs=ffmpeg is not None, synthetic=hearo is not None)
     folder = out_root / key
     if (folder / "done.json").exists():
         log(f"✔ data cache {folder} is current")
@@ -365,6 +377,8 @@ def build(
         "key": key,
         "manifest_sha256": sha,
         "config": asdict(cfg),
+        "codecs": ffmpeg is not None,
+        "synthetic": hearo is not None,
         "bank_events": len(bank),
         "sets": {s: {"clips": len(v), "minutes": round(sum(i.seconds for i in v) / 60, 1)} for s, v in sets.items()},
     }

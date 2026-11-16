@@ -77,8 +77,9 @@ def run_all(tmp_path: Path, val_events: bool = True) -> tuple[Path, Path]:
 def test_build_train_evaluate_report(tmp_path):
     run, report = run_all(tmp_path)
     assert run.name == "20261116-120000-tiny"
-    for f in ("config.yaml", "meta.json", "history.jsonl", "model.pt", "best.json", "metrics.json", "dsp.json"):
+    for f in ("config.yaml", "meta.json", "history.jsonl", "model.pt", "best.json", "metrics.json"):
         assert (run / f).exists(), f
+    assert (tmp_path / "features" / f"dsp-{'f' * 16}.json").exists(), "one DSP replay per manifest"
     meta = json.loads((run / "meta.json").read_text())
     assert meta["manifest_sha256"] == "f" * 64 and meta["params"] > 0
     metrics = json.loads((run / "metrics.json").read_text())
@@ -98,6 +99,27 @@ def test_train_items_include_mixes_with_more_events(tmp_path):
     assert [i.kind for i in train] == ["real", "mix", "mix"]
     assert all(i.y.sum() > train[0].y.sum() for i in train[1:])
     assert all(len(i.feats) == feat.n_frames(3 * feat.SR) for i in train)
+
+
+def test_dsp_baseline_tolerates_missing_clips_and_merges(tmp_path):
+    from hearo_ml.scoring import Labels
+
+    items = [
+        ds.Item("a", "real", "val", np.zeros((0, 48)), np.zeros(0), np.zeros(0), Labels((Span(1.0, 1.02),)), 8.0),
+        ds.Item("b", "real", "val", np.zeros((0, 48)), np.zeros(0), np.zeros(0), Labels(), 8.0),
+    ]
+    s, missing = ev.score_dsp({"a": [Span(1.0, 1.01), Span(1.02, 1.03)]}, items)
+    assert missing == 1
+    assert (s.detections, s.hit_regions, s.false_positives) == (1, 1, 0), "two close catches are one event"
+
+
+def test_resolve_run_accepts_repo_relative_paths_and_names(tmp_path):
+    runs = tmp_path / "runs"
+    (runs / "20261116-1-x").mkdir(parents=True)
+    assert ev.resolve_run("20261116-1-x", runs) == runs / "20261116-1-x"
+    assert ev.resolve_run(str(runs / "20261116-1-x"), runs) == runs / "20261116-1-x"
+    assert ev.resolve_run("nope", runs) is None
+    assert ev.resolve_run("ml/configs", runs) == ds.REPO / "ml/configs"
 
 
 def test_test_metrics_withheld_without_validation_events(tmp_path):

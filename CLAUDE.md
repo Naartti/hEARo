@@ -2,7 +2,9 @@
 
 ## Claude Code specifics
 
-- Work autonomously through docs/PROGRESS.md; stop only for items in docs/OPEN_QUESTIONS.md.
+- Work autonomously through docs/PROGRESS.md (+ docs/progress.d/); stop only for items in
+  docs/OPEN_QUESTIONS.md. Feature branches record tasks in progress.d/ and changelog.d/, never
+  in PROGRESS.md or CHANGELOG.md (parallel PRs would conflict; `just check` enforces it).
 - Run `just check` before every commit and `just ci` at milestone end (see "CI" above).
   The Bash hook blocks `git commit` if the tree changed since the last green check.
 - Change files with Edit/Write, not shell heredocs or scripts: the hooks in

@@ -35,13 +35,13 @@ A red gate is never committed: fix the cause, don't skip the step.
 This is the default workflow for every request; the human never has to restate it.
 
 1. **Understand.** Read the docs for the area (docs/DESIGN.md for UI, docs/ARCHITECTURE.md,
-   docs/adr/). Add the task to docs/PROGRESS.md (current milestone, or the Backlog section if it
-   is off-milestone) with acceptance criteria written from the human's words.
+   docs/adr/). Write the task to `docs/progress.d/<branch>.md` (which PROGRESS.md milestone or
+   Backlog item it belongs to) with acceptance criteria written from the human's words.
 2. **Capture intent, not just the ask.** A request often implies a product or design preference
    ("native", "keep it open while testing", "one window"). Record it in docs/DESIGN.md as a
    dated *human request* note, generalise it into **Principles** when it applies beyond this
-   feature, and bring existing UI that now contradicts it into line (or list the leftovers in
-   PROGRESS.md as follow-ups).
+   feature, and bring existing UI that now contradicts it into line (or list the leftovers as
+   follow-ups in the branch's progress.d/ file).
 3. **Decide, don't stall.** Pick the option that fits DESIGN.md, the macOS HIG and existing
    patterns. Record non-trivial choices (ADR via the write-adr skill, or DESIGN.md). Stop only
    for choices that are the human's and costly to undo; put those in docs/OPEN_QUESTIONS.md and
@@ -95,7 +95,8 @@ Dependabot PR whose every bump is semver-compatible and that only touches manife
 or workflow pins, once hosted checks are green and, for Cargo, a local `just ci` (golden + CPU
 budgets) passes; (b) a revert of such a merge (revert + `ignore:` entry only). Majors, 0.x
 minor bumps, red runs and anything needing code changes follow "Any change"; deferred updates
-are ignored and noted under *Dependency notes* in PROGRESS.md.
+are ignored and noted in `docs/progress.d/deps-<date>.md` (a roll-up moves them under
+*Dependency notes* in PROGRESS.md).
 
 ## Other commands (always via just)
 

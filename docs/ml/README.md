@@ -94,3 +94,44 @@ to write a manifest that breaks them (`check_no_leakage`).
 Snapshots contain other people's voices. They stay on this Mac (or are merged
 between the human's Macs with `hearo dataset export/import`); never committed or uploaded. A
 model trained on them is not published without a separate decision.
+
+## Training and evaluation (Phase A detector, ADR 0020)
+
+After a review session, one command does everything:
+
+```sh
+just ml-retrain   # import snapshots → build data → train each ml/configs/*.yaml → report each
+```
+
+Or step by step:
+
+| Step | Command | Output (git-ignored unless noted) |
+|---|---|---|
+| Manifest | `just ml-import-snapshots` | `ml/data/processed/snapshots/` |
+| Data | `just ml-data [CONFIG=…]` | `ml/data/processed/features/<key>/`, reused while the manifest and the config's `data` section are unchanged |
+| Train | `just ml-train CONFIG=ml/configs/detector.yaml` | `ml/runs/<timestamp>-<name>/`: config, `meta.json` (git SHA, manifest hash, data key), `history.jsonl`, `model.pt`, `best.json` |
+| Report | `just ml-eval [RUN=<run>]` (default: the latest) | `docs/ml/reports/<run>.md` (committed), `metrics.json` in the run |
+
+Two configs: `detector.yaml` is the **streaming detector** (causal, 30 ms lookahead, the one
+that will run live), and `teacher.yaml` is the **offline teacher** (bidirectional, sees the
+whole clip; the upper bound, later the auto-save checker). Change hyperparameters in the
+YAML, never in code.
+
+What the data step builds:
+
+- **train**: each train-day clip as recorded, plus 12 mixes of it (train-day smacks and
+  synthetic `gen-signals` smacks/clicks pasted in at −20 to +10 dB, EQ tilt, gain, Opus/AAC
+  round-trips), plus synthetic speech from train seeds.
+- **val / test**: the real clips of those days, as they are.
+- **synthetic_test**: `gen-signals` from held-out seeds (the M7 F1 and music targets).
+
+How to read a report:
+
+- **val** decides: the checkpoint and the threshold are picked there. **test** is looked at,
+  never tuned on, and with fewer than 50 test events its intervals are too wide to rank
+  models (the report warns).
+- Each table puts the model next to the **DSP de-smack on the same clips**, scored by the
+  same rules as `hearo dataset eval`. The *auto-saved clips* rows are de-smack's own catches
+  and your rejections, so a model can only lose recall there; the interesting number is its
+  false positives on your rejected spans.
+- Reports contain aggregate numbers only, never clip names or audio.

@@ -1,0 +1,26 @@
+# Offline teacher: sees the whole clip (bidirectional), can't stream. The upper bound for the
+# streaming detector, and later the checker that ranks auto-saved clips for review.
+# Same data section as detector.yaml, so both share one data cache; same regularisation.
+name: teacher
+data:
+  mixes_per_clip: 12
+  esr_db: [-20.0, 10.0]
+  hard_negative_weight: 4.0
+  seed: 0
+model:
+  channels: 32
+  hidden: 32
+  lookahead: 0
+  bidirectional: true
+  dropout: 0.3
+train:
+  steps: 1500
+  batch: 32
+  crop_frames: 400
+  lr: 0.002
+  weight_decay: 0.01
+  focal_gamma: 2.0
+  focal_alpha: 0.75
+  positive_crops: 0.5
+  eval_every: 100
+  seed: 0

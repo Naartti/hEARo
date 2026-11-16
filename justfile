@@ -148,17 +148,27 @@ ml-check:
 ml-import-snapshots *ARGS:
     cd ml && uv run --frozen python -m hearo_ml.snapshots {{ARGS}}
 
-# Download/prepare datasets (M7)
-ml-data:
-    @echo "Arrives in M7."
+# Manifest → training/eval feature sets (mixes, codecs, synthetic; cached by manifest + data config)
+ml-data CONFIG="ml/configs/detector.yaml":
+    cd ml && uv run --frozen python -m hearo_ml.dataset --config ../{{CONFIG}}
 
-# Train a model (M7)
-ml-train:
-    @echo "Arrives in M7."
+# Train a detector from a config → ml/runs/<timestamp>-<name>/ (builds the data first if needed)
+ml-train CONFIG="ml/configs/detector.yaml":
+    cd ml && uv run --frozen python -m hearo_ml.train --config ../{{CONFIG}}
 
-# Evaluate and write a report (M7)
-ml-eval:
-    @echo "Arrives in M7."
+# Evaluate a run (default: the latest) vs the DSP de-smack → docs/ml/reports/<run>.md
+ml-eval RUN="":
+    cd ml && uv run --frozen python -m hearo_ml.evaluate {{ if RUN == "" { "" } else { "--run " + RUN } }}
+
+# New data arrived: re-import the snapshots, train every config in ml/configs/, report each
+ml-retrain:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just ml-import-snapshots
+    for c in ml/configs/*.yaml; do
+        just ml-train "$c"
+        just ml-eval
+    done
 
 # Export ONNX (M7)
 ml-export:

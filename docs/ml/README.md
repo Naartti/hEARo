@@ -49,13 +49,26 @@ a verified smack) and **X** marks it a false positive (the sidecar's `rejected` 
 `just ml-import-snapshots` (`hearo_ml.snapshots`) turns this Mac's reviewed snapshots into
 `ml/data/processed/snapshots/manifest.jsonl` (one line per clip: WAV path, day, split,
 regions, rejected spans) and `pool.jsonl` (mixing-pool events), both git-ignored, and prints a
-summary with the skipped clips by reason. It applies the rules below and refuses to write a
-manifest that breaks them (`check_no_leakage`). A day's split comes from a stable hash of the
-date (≈ 20 % test, 10 % validation), so it doesn't move as days are added; with only a few
-days the split is coarse (with three days, one whole day is test — and if that's the day
-of the auto-saved clips, they all drop out: they can be neither test nor training data).
-Pool events are lip smacks and mouth clicks from training days with no other region within
-100 ms and audio 50 ms either side ≥ 20 dB below the event.
+summary with the skipped clips by reason and warnings. It applies the rules below and refuses
+to write a manifest that breaks them (`check_no_leakage`).
+
+- **A day** is the local date a listening session started (clips < 1 h apart are one
+  session, so a call across midnight stays together); `--tz` fixes the zone.
+- **Splits are locked:** the first run writes `splits.lock.json` next to the manifest, and a
+  day in it never changes split — a test day is never later trained or tuned on. New days
+  get theirs from a stable hash of the date (≈ 20 % test, 10 % validation). Until there are
+  enough days, fallbacks fill the missing splits (with three days, one whole day each); a
+  fallback test day is the one with the fewest auto-saved clips, which can't be test data.
+  Delete the lock only on purpose (a new dataset version), and note it in the model card.
+- `meta.json` records the manifest/pool SHA-256, the parameters and the day → split map:
+  log it with every training run and report.
+- **No tuning on test.** Use validation; with no validation days yet, wait. Fewer than 50
+  test events gives intervals too wide to compare models (the summary warns).
+- **Known limit:** splitting by day keeps a day's meetings apart, not the people — recurring
+  colleagues can be in train and test. Say so in the model card; a per-clip "group" tag
+  (meeting series, podcast) would let the split follow speakers.
+- Pool events are lip smacks and mouth clicks from training days with no other region (or
+  rejected span) within 100 ms and audio 50 ms either side ≥ 20 dB below the event.
 
 - **Splits by recording day/session**, never by clip: the same people recur across meetings,
   and one speaker's smacks in both train and test inflates every metric. A test enforces it.

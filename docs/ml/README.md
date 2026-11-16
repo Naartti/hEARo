@@ -51,6 +51,8 @@ a verified smack) and **X** marks it a false positive (the sidecar's `rejected` 
   counts them and gives separate totals for the recorded clips — compare runs over time on
   that line, since the mix shifts as new clips arrive. Known limit: settings are recorded when
   the clip is saved, so a toggle or slider moved within the clip's 8 s isn't reflected.
+  `--json` prints one line per clip with its detections instead (`{"stem", "detections":
+  [{"start_s", "end_s"}]}`); `just ml-eval` uses it to score the DSP baseline per split.
 
 ### Using it
 

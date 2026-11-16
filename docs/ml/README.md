@@ -110,7 +110,7 @@ Or step by step:
 | Manifest | `just ml-import-snapshots` | `ml/data/processed/snapshots/` |
 | Data | `just ml-data [CONFIG=…]` | `ml/data/processed/features/<key>/`, reused while the manifest and the config's `data` section are unchanged |
 | Train | `just ml-train CONFIG=ml/configs/detector.yaml` | `ml/runs/<timestamp>-<name>/`: config, `meta.json` (git SHA, manifest hash, data key), `history.jsonl`, `model.pt`, `best.json` |
-| Report | `just ml-eval [RUN=<run>]` (default: the latest) | `docs/ml/reports/<run>.md` (committed), `metrics.json` in the run |
+| Report | `just ml-eval [RUN=<run>] [TEST=1]` (default: the latest run, validation only) | `docs/ml/reports/<run>.md` (committed), `metrics.json` in the run |
 
 Two configs: `detector.yaml` is the **streaming detector** (causal, 30 ms lookahead, the one
 that will run live), and `teacher.yaml` is the **offline teacher** (bidirectional, sees the
@@ -121,17 +121,21 @@ What the data step builds:
 
 - **train**: each train-day clip as recorded, plus 12 mixes of it (train-day smacks and
   synthetic `gen-signals` smacks/clicks pasted in at −20 to +10 dB, EQ tilt, gain, Opus/AAC
-  round-trips), plus synthetic speech from train seeds.
+  round-trips), plus the synthetic speech-with-events signals from train seeds.
 - **val / test**: the real clips of those days, as they are.
-- **synthetic_test**: `gen-signals` from held-out seeds (the M7 F1 and music targets).
+- **synthetic_test**: `gen-signals` from held-out seeds, 5 min each (the M7 F1 and music
+  targets). Its clean speech and music are never trained on.
 
 How to read a report:
 
-- **val** decides: the checkpoint and the threshold are picked there. **test** is looked at,
-  never tuned on, and with fewer than 50 test events its intervals are too wide to rank
-  models (the report warns).
+- **val** decides: the checkpoint and the threshold are picked there, so its numbers are
+  optimistic. **test** is scored only with `TEST=1`, once a model is chosen; each run counts
+  how often it was looked at. Below 50 test events its intervals are too wide to rank models.
 - Each table puts the model next to the **DSP de-smack on the same clips**, scored by the
-  same rules as `hearo dataset eval`. The *auto-saved clips* rows are de-smack's own catches
-  and your rejections, so a model can only lose recall there; the interesting number is its
-  false positives on your rejected spans.
+  same rules as `hearo dataset eval`, but how the clips were picked biases that comparison:
+  test clips are smacks de-smack *missed* (its recall is low there by design), and validation
+  is mostly its own auto-saved catches (high recall, and your rejections are its false hits).
+  Read the DSP row as context. A fair comparison needs clips saved at random times.
+- FP/min is over 8 s clips saved around events, so it isn't a rate for normal listening; the
+  bracket is a 95 % upper bound.
 - Reports contain aggregate numbers only, never clip names or audio.

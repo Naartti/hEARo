@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 import soundfile as sf
 
 from hearo_ml import dataset as ds
@@ -59,7 +60,7 @@ def fake_manifest(root: Path, val_events: bool = True) -> Path:
     return out / "manifest.jsonl"
 
 
-def run_all(tmp_path: Path, val_events: bool = True) -> tuple[Path, Path]:
+def run_all(tmp_path: Path, val_events: bool = True, include_test: bool = True) -> tuple[Path, Path]:
     manifest = fake_manifest(tmp_path, val_events)
     cfg_path = tmp_path / "tiny.yaml"
     cfg_path.write_text(CONFIG)
@@ -70,7 +71,9 @@ def run_all(tmp_path: Path, val_events: bool = True) -> tuple[Path, Path]:
     assert any("is current" in line for line in logs), "a second build reuses the cache"
     run = tr.train(cfg_path, folder, tmp_path / "runs", log=logs.append, now=dt.datetime(2026, 11, 16, 12))
     dsp = {"snapshot-1-missed": [], "snapshot-2-auto": [Span(1.5, 1.51)], "snapshot-3-missed": [Span(0.9, 0.91)]}
-    report = ev.run_eval(run, tmp_path / "features", tmp_path / "reports", lambda: dsp, log=logs.append)
+    report = ev.run_eval(
+        run, tmp_path / "features", tmp_path / "reports", lambda: dsp, log=logs.append, include_test=include_test
+    )
     return run, report
 
 
@@ -123,7 +126,25 @@ def test_resolve_run_accepts_repo_relative_paths_and_names(tmp_path):
 
 
 def test_test_metrics_withheld_without_validation_events(tmp_path):
-    run, report = run_all(tmp_path, val_events=False)
+    run, report = run_all(tmp_path, val_events=False, include_test=True)
     metrics = json.loads((run / "metrics.json").read_text())
     assert "test" not in metrics["splits"]
     assert "test metrics withheld" in report.read_text()
+    best = json.loads((run / "best.json").read_text())
+    assert best["step"] == 4 and best["selected_by"].startswith("last_step"), "no val events: keep the last step"
+
+
+def test_test_is_scored_only_on_request_and_views_are_counted(tmp_path):
+    run, report = run_all(tmp_path, include_test=False)
+    assert "test" not in json.loads((run / "metrics.json").read_text())["splits"]
+    assert "test not scored" in report.read_text()
+    for n in (1, 2):
+        ev.run_eval(run, tmp_path / "features", tmp_path / "reports", None, log=lambda _: None, include_test=True)
+        assert json.loads((run / "test_views.json").read_text())["views"] == n
+    assert "## test" in report.read_text() and "scored for this run 2 time(s)" in report.read_text()
+
+
+def test_poisson_upper_bound():
+    assert ev.fp_rate_upper(0, 60.0) == pytest.approx(3.689, abs=1e-3)
+    assert ev.fp_rate_upper(0, 15 * 60.0) == pytest.approx(3.689 / 15, abs=1e-3)
+    assert ev.fp_rate_upper(3, 0.0) is None

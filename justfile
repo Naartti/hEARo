@@ -156,18 +156,18 @@ ml-data CONFIG="ml/configs/detector.yaml":
 ml-train CONFIG="ml/configs/detector.yaml":
     cd ml && uv run --frozen python -m hearo_ml.train --config ../{{CONFIG}}
 
-# Evaluate a run (default: the latest) vs the DSP de-smack → docs/ml/reports/<run>.md
-ml-eval RUN="":
-    cd ml && uv run --frozen python -m hearo_ml.evaluate {{ if RUN == "" { "" } else { "--run " + RUN } }}
+# Evaluate a run (default: the latest) vs the DSP de-smack → docs/ml/reports/<run>.md; TEST=1 also scores test
+ml-eval RUN="" TEST="":
+    cd ml && uv run --frozen python -m hearo_ml.evaluate {{ if RUN == "" { "" } else { "--run " + RUN } }} {{ if TEST == "" { "" } else { "--test" } }}
 
-# New data arrived: re-import the snapshots, train every config in ml/configs/, report each
+# New data arrived: re-import the snapshots, train every config in ml/configs/, report each (validation only)
 ml-retrain:
     #!/usr/bin/env bash
     set -euo pipefail
     just ml-import-snapshots
     for c in ml/configs/*.yaml; do
-        just ml-train "$c"
-        just ml-eval
+        run=$(just ml-train "$c" | tee /dev/stderr | sed -n 's/^✔ run //p' | tail -1)
+        just ml-eval RUN="$run"
     done
 
 # Export ONNX (M7)

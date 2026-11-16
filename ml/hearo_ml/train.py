@@ -124,7 +124,12 @@ def git_sha() -> str:
     try:
         git = ["git", "-C", str(ds.REPO)]
         sha = subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
-        status = subprocess.run([*git, "status", "--porcelain"], capture_output=True, text=True, check=True).stdout
+        # Only what shapes a run: the ML code and configs, the Rust that generates signals
+        # and scores the baseline. (Untracked reports or notes elsewhere don't count.)
+        paths = ["ml/hearo_ml", "ml/configs", "ml/pyproject.toml", "ml/uv.lock", "crates", "Cargo.lock"]
+        status = subprocess.run(
+            [*git, "status", "--porcelain", "--", *paths], capture_output=True, text=True, check=True
+        ).stdout
         return sha + ("+dirty" if status.strip() else "")
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
@@ -152,6 +157,7 @@ def train(
     torch.manual_seed(tcfg.seed)
     rng = np.random.default_rng(tcfg.seed)
     train_items, val_items = ds.load(data_folder, "train"), ds.load(data_folder, "val")
+    val_events = sum(len(it.labels.targets) for it in val_items)
     if not train_items:
         raise SystemExit("✖ no training clips")
     stamp = (now or dt.datetime.now()).strftime("%Y%m%d-%H%M%S")
@@ -216,7 +222,9 @@ def train(
             with (run / "history.jsonl").open("a") as f:
                 f.write(json.dumps(entry) + "\n")
             log(f"  step {step:5d}  loss {float(loss):.4f}  val F1 {f1:.3f} @ {thr}")
-            if f1 > best_f1 or not val_items:
+            # Without validation events every F1 is 0: keep the last step, not the first.
+            if f1 > best_f1 or not val_events:
+                entry["selected_by"] = "val_f1" if val_events else "last_step (validation has no events)"
                 best_f1 = f1
                 torch.save(model.to_checkpoint(), run / "model.pt")
                 (run / "best.json").write_text(json.dumps(entry, indent=2) + "\n")
@@ -238,7 +246,7 @@ def main(argv: list[str] | None = None) -> int:
 
     folder = ds.build(args.manifest, args.data, dcfg, ds.default_hearo(), shutil.which("ffmpeg"))
     run = train(args.config, folder, args.runs)
-    print(f"✔ {run}")
+    print(f"✔ run {run}")  # `just ml-retrain` reads this line to evaluate exactly this run
     return 0
 
 

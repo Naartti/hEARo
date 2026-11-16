@@ -26,11 +26,12 @@ from collections.abc import Callable
 from pathlib import Path
 
 import torch
+from scipy.stats import chi2
 
 from hearo_ml import dataset as ds
 from hearo_ml.model import Detector
 from hearo_ml.scoring import Score, Span, merge, score, wilson
-from hearo_ml.train import best_threshold, score_probs
+from hearo_ml.train import score_probs
 
 MIN_TEST_EVENTS = 50
 
@@ -84,10 +85,35 @@ def summary(s: Score | None) -> dict | None:
         "precision_ci": wilson(s.hits, judged),
         "f1": s.f1(),
         "fp_per_min": s.fp_per_min(),
+        "fp_per_min_upper": fp_rate_upper(s.false_positives, s.seconds),
     }
 
 
-def evaluate(run: Path, data_folder: Path, dsp: dict[str, list[Span]] | None) -> dict:
+def fp_rate_upper(k: int, seconds: float) -> float | None:
+    """Exact 95 % (one-sided 97.5 %) Poisson upper bound on false positives per minute."""
+    if seconds <= 0:
+        return None
+    return float(chi2.ppf(0.975, 2 * k + 2) / 2) / (seconds / 60)
+
+
+#: Thresholds for the precision/recall sweep on validation (a threshold-free view).
+SWEEP = (0.3, 0.5, 0.7, 0.8, 0.9)
+
+#: How each split's clips were picked: the DSP row only means something read with this.
+SPLIT_NOTES = {
+    "val": (
+        "Selection set: the checkpoint and threshold were picked here, so the model's row is optimistic. "
+        "Most clips are auto-saved de-smack catches (DSP recall high by construction) and their rejected "
+        "spans are DSP's own false hits."
+    ),
+    "test": (
+        "Clips you saved because de-smack *missed* a smack: DSP recall is low by construction, so the DSP "
+        "row is context, not a fair head-to-head."
+    ),
+}
+
+
+def evaluate(run: Path, data_folder: Path, dsp: dict[str, list[Span]] | None, include_test: bool = False) -> dict:
     model = Detector.from_checkpoint(torch.load(run / "model.pt", weights_only=False, map_location="cpu"))
     best = json.loads((run / "best.json").read_text())
     meta = json.loads((run / "meta.json").read_text())
@@ -107,6 +133,12 @@ def evaluate(run: Path, data_folder: Path, dsp: dict[str, list[Span]] | None) ->
         items = sets[split]
         if split == "test" and val_events == 0:
             res["warnings"].append("validation has no events: test metrics withheld (no threshold to apply)")
+            continue
+        if split == "test" and not include_test:
+            res["warnings"].append(
+                "test not scored (pass `--test` / `just ml-eval RUN=… TEST=1`): look at it once a model is "
+                "chosen on validation, not every iteration"
+            )
             continue
 
         dsp_all, missing = _baseline(dsp, items)
@@ -139,17 +171,17 @@ def evaluate(run: Path, data_folder: Path, dsp: dict[str, list[Span]] | None) ->
             r: [it for it in syn if it.role.startswith(r)]
             for r in ("speech_smacks", "speech_clicks", "speech.", "music")
         }
+        p = probs["synthetic_test"]
         res["synthetic"] = {
-            "events": summary(
-                score_probs(probs["synthetic_test"], by_role["speech_smacks"] + by_role["speech_clicks"], thr)
-            ),
-            "speech_fp_per_min": score_probs(probs["synthetic_test"], by_role["speech."], thr).fp_per_min(),
-            "music_fp_per_min": score_probs(probs["synthetic_test"], by_role["music"], thr).fp_per_min(),
+            "events": summary(score_probs(p, by_role["speech_smacks"] + by_role["speech_clicks"], thr)),
+            "speech": summary(score_probs(p, by_role["speech."], thr)),
+            "music": summary(score_probs(p, by_role["music"], thr)),
         }
-    # A threshold-free view on validation: the best F1 any threshold reaches.
-    if sets["val"]:
-        t, s = best_threshold(probs["val"], sets["val"])
-        res["val_oracle"] = {"threshold": t, "f1": s.f1()}
+    if sets["val"] and val_events:
+        res["val_sweep"] = []
+        for t in SWEEP:
+            s = score_probs(probs["val"], sets["val"], t)
+            res["val_sweep"].append({"threshold": t, "precision": s.precision(), "recall": s.recall()})
     return res
 
 
@@ -172,6 +204,8 @@ def _row(label: str, s: dict | None) -> str:
     if s is None:
         return f"| {label} | {NA} | {NA} | {NA} | {NA} | {NA} |"
     fpm = _num(s["fp_per_min"])
+    if s.get("fp_per_min_upper") is not None:
+        fpm += f" (≤ {s['fp_per_min_upper']:.1f})"
     return (
         f"| {label} | {s['hit_regions']}/{s['regions']} = {_pct(s['recall'])}{_ci(s['recall_ci'])} | "
         f"{_pct(s['precision'])}{_ci(s['precision_ci'])} | {_pct(s['f1'])} | {fpm} | "
@@ -182,27 +216,36 @@ def _row(label: str, s: dict | None) -> str:
 def report(res: dict, previous: dict | None) -> str:
     m = res["meta"]
     sha = m["git_sha"][:10] + ("+dirty" if m["git_sha"].endswith("+dirty") else "")
+    mc, tc = m["model"], m["train"]
     lines = [
         f"# {res['run']}",
         "",
-        f"Model `{m['name']}`: {m['params']:,} parameters, lookahead "
-        f"{0 if m['model']['bidirectional'] else m['model']['lookahead'] * 10} ms"
-        f"{' (teacher: bidirectional, offline only)' if m['model']['bidirectional'] else ''}. "
-        f"Best validation step {res['step']}, threshold {res['threshold']}.",
+        f"Model `{m['name']}`: {m['params']:,} parameters ({mc['channels']} channels, {mc['hidden']} GRU units, "
+        f"dropout {mc.get('dropout', 0.0)}), lookahead "
+        f"{0 if mc['bidirectional'] else mc['lookahead'] * 10} ms"
+        f"{' (teacher: bidirectional, offline only)' if mc['bidirectional'] else ''}. "
+        f"{tc['steps']} steps; best validation step {res['step']}, threshold {res['threshold']}.",
         "",
         f"Data: manifest `{m['manifest_sha256'][:12]}`, cache `{m['data_key']}`, git `{sha}`. "
         + ", ".join(f"{k} {v['clips']} clips / {v['minutes']} min" for k, v in m["data_sets"].items())
         + ".",
         "",
     ]
+    if res.get("test_views"):
+        res["warnings"].append(f"test scored for this run {res['test_views']} time(s)")
     for w in res["warnings"]:
         lines.append(f"> ⚠ {w}")
     if res["warnings"]:
         lines.append("")
-    head = "| | Recall (95 % CI) | Precision (95 % CI) | F1 | FP/min | False positives |\n|---|---|---|---|---|---|"
+    head = (
+        "| | Recall (95 % CI) | Precision (95 % CI) | F1 | FP/min (95 % upper) | False positives |\n"
+        "|---|---|---|---|---|---|"
+    )
     for split, e in res["splits"].items():
         lines += [
             f"## {split} ({e['clips']} real clips)",
+            "",
+            SPLIT_NOTES[split],
             "",
             head,
             _row("model", e["model"]),
@@ -220,17 +263,21 @@ def report(res: dict, previous: dict | None) -> str:
         lines += [
             "## Synthetic test (gen-signals, held-out seeds)",
             "",
+            "M7 targets: F1 ≥ 80 % on synthetic events, ≤ 2 false positives per minute on music. The smacks and "
+            "clicks come from the same generator as the synthetic training events (other seeds), so this is "
+            "in-distribution; the clean speech and music were never trained on. Crude stand-ins: real days decide.",
+            "",
             head,
             _row("smacks + clicks", s["events"]),
-            "",
-            f"False positives per minute: clean speech {_num(s['speech_fp_per_min'])}, "
-            f"music {_num(s['music_fp_per_min'])} "
-            "(M7 targets: F1 ≥ 80 %, music ≤ 2/min). Synthetic signals are crude stand-ins; real days decide.",
+            _row("clean speech (no events)", s["speech"]),
+            _row("music (no events)", s["music"]),
             "",
         ]
-    if "val_oracle" in res:
+    if res.get("val_sweep"):
         lines += [
-            f"Best validation F1 at any threshold: {_pct(res['val_oracle']['f1'])} @ {res['val_oracle']['threshold']}.",
+            "Validation precision / recall at other thresholds: "
+            + ", ".join(f"{r['threshold']}: {_pct(r['precision'])} / {_pct(r['recall'])}" for r in res["val_sweep"])
+            + ".",
             "",
         ]
     if previous:
@@ -242,7 +289,10 @@ def report(res: dict, previous: dict | None) -> str:
         ]
     lines += [
         "Event rules match `hearo dataset eval`: ±20 ms tolerance, first 0.5 s ignored, detections on neutral "
-        "regions (breaths) not counted, false positives = everything else in exhaustively reviewed clips.",
+        "regions (breaths) not counted, false positives = everything else in exhaustively reviewed clips; "
+        "detections < 30 ms apart are one event on both sides. FP/min is over 8 s clips saved around events, "
+        "not a rate for normal listening. Wilson intervals treat events as independent; they cluster by clip "
+        "and day, so the true uncertainty is wider.",
         "",
     ]
     return "\n".join(lines)
@@ -264,7 +314,14 @@ def previous_best(runs: Path, exclude: str, manifest: str, name: str) -> dict | 
     return best
 
 
-def run_eval(run: Path, data_root: Path, reports: Path, dsp_source: Callable[[], dict] | None, log=print) -> Path:
+def run_eval(
+    run: Path,
+    data_root: Path,
+    reports: Path,
+    dsp_source: Callable[[], dict] | None,
+    log=print,
+    include_test: bool = False,
+) -> Path:
     meta = json.loads((run / "meta.json").read_text())
     folder = data_root / meta["data_key"]
     # One DSP replay per manifest, shared by every config's run (a clip's audio and recorded
@@ -276,7 +333,13 @@ def run_eval(run: Path, data_root: Path, reports: Path, dsp_source: Callable[[],
     elif dsp_source is not None:
         dsp = dsp_source()
         cache.write_text(json.dumps({k: [[s.start, s.end] for s in v] for k, v in dsp.items()}))
-    res = evaluate(run, folder, dsp)
+    res = evaluate(run, folder, dsp, include_test)
+    if include_test:
+        # How often test has been looked at for this run: every look is a chance to tune on it.
+        views = run / "test_views.json"
+        n = (json.loads(views.read_text())["views"] if views.exists() else 0) + 1
+        views.write_text(json.dumps({"views": n}) + "\n")
+        res["test_views"] = n
     (run / "metrics.json").write_text(json.dumps(res, indent=2, default=float) + "\n")
     prev = previous_best(run.parent, run.name, meta["manifest_sha256"], meta["name"])
     reports.mkdir(parents=True, exist_ok=True)
@@ -309,13 +372,16 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--data", type=Path, default=ds.ML_DIR / "data/processed/features")
     ap.add_argument("--reports", type=Path, default=ds.REPO / "docs/ml/reports")
     ap.add_argument("--no-dsp", action="store_true", help="skip the DSP baseline")
+    ap.add_argument("--test", action="store_true", help="also score the test days (once a model is chosen)")
     args = ap.parse_args(argv)
     run = resolve_run(args.run, args.runs)
     if run is None or not (run / "model.pt").exists():
         print("✖ no finished run: train one with `just ml-train`", file=sys.stderr)
         return 1
     hearo = ds.default_hearo()
-    run_eval(run, args.data, args.reports, None if args.no_dsp else (lambda: dsp_detections(hearo)))
+    run_eval(
+        run, args.data, args.reports, None if args.no_dsp else (lambda: dsp_detections(hearo)), include_test=args.test
+    )
     return 0
 
 

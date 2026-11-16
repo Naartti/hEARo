@@ -41,7 +41,7 @@ from hearo_ml import features as feat
 from hearo_ml.scoring import TARGET_CLASSES, Labels, Span, is_own_rejection, labels_from_clip
 
 #: Bump when a change here changes the built sets (it's part of the cache key).
-FORMAT = 1
+FORMAT = 2
 ML_DIR = Path(__file__).resolve().parents[1]
 REPO = ML_DIR.parent
 
@@ -63,6 +63,9 @@ class DataConfig:
     synthetic_train_seeds: tuple[int, ...] = (101, 102, 103, 104)
     synthetic_test_seeds: tuple[int, ...] = (1, 2, 3)
     synthetic_secs: float = 30.0
+    #: Long enough that "≤ 2 false positives per minute on music" can be shown: with 0 false
+    #: positives in three 5 min clips, the 95 % upper bound is 3 / 14.9 min ≈ 0.2/min.
+    synthetic_test_secs: float = 300.0
     hard_negative_weight: float = 4.0
     #: How often a mix draws a real (train-day) event rather than a synthetic one.
     real_event_share: float = 0.6
@@ -156,13 +159,13 @@ def cut_event(x: np.ndarray, start_s: float, end_s: float, pad_s: float = 0.003)
 def mix(
     background: np.ndarray,
     regions: list[dict],
-    bank: list[np.ndarray],
+    bank: list[tuple[np.ndarray, str]],
     cfg: DataConfig,
     rng: np.random.Generator,
     weights: np.ndarray | None = None,
 ) -> tuple[np.ndarray, list[dict]]:
-    """Paste bank events (drawn with `weights`) into `background`; returns the mix and its
-    regions (old + new)."""
+    """Paste bank events `(audio, class)` (drawn with `weights`) into `background`; returns the
+    mix and its regions (old + new), each pasted event keeping its class."""
     out = background.astype(np.float32).copy()
     regs = [dict(r) for r in regions]
     if not bank:
@@ -170,7 +173,7 @@ def mix(
     level = active_rms_db(background)
     n = int(rng.integers(cfg.events_per_mix[0], cfg.events_per_mix[1] + 1))
     for _ in range(n):
-        ev = bank[int(rng.choice(len(bank), p=weights))]
+        ev, cls = bank[int(rng.choice(len(bank), p=weights))]
         if rng.random() < 0.5:
             ev = -ev
         dur = len(ev) / feat.SR
@@ -186,7 +189,7 @@ def mix(
         gain_db = level + float(rng.uniform(*cfg.esr_db)) - _rms_db(ev)
         a = int(t * feat.SR)
         out[a : a + len(ev)] += ev * np.float32(10 ** (gain_db / 20))
-        regs.append({"start_s": t + 0.003, "end_s": t + dur - 0.003, "cls": "lip_smack"})
+        regs.append({"start_s": t + 0.003, "end_s": t + dur - 0.003, "cls": cls})
     return out, sorted(regs, key=lambda r: r["start_s"])
 
 
@@ -273,9 +276,35 @@ def synthetic(hearo: list[str], seed: int, secs: float, workdir: Path) -> list[t
     return res
 
 
-def cache_key(manifest_sha: str, cfg: DataConfig, codecs: bool = True, synthetic: bool = True) -> str:
-    """Changes with anything that changes the sets, including whether ffmpeg (codec
-    round-trips) and the `hearo` CLI (synthetic signals) were there to use."""
+def code_fingerprint() -> str:
+    """The feature and data code itself, so an edit there can't reuse stale sets."""
+    h = hashlib.sha256()
+    for name in ("features.py", "dataset.py", "scoring.py"):
+        h.update((Path(__file__).parent / name).read_bytes())
+    return h.hexdigest()[:16]
+
+
+def tool_versions(ffmpeg: str | None) -> dict:
+    import scipy
+    import soundfile
+
+    v = {"numpy": np.__version__, "scipy": scipy.__version__, "soundfile": soundfile.__version__}
+    if ffmpeg:
+        try:
+            out = subprocess.run([ffmpeg, "-version"], capture_output=True, text=True, check=True).stdout
+            v["ffmpeg"] = out.splitlines()[0] if out else "unknown"
+        except (OSError, subprocess.CalledProcessError):
+            v["ffmpeg"] = "unknown"
+    return v
+
+
+def cache_key(
+    manifest_sha: str, cfg: DataConfig, codecs: bool = True, synthetic: bool = True, tools: dict | None = None
+) -> str:
+    """Changes with anything that changes the sets: manifest, data config, this code, tool
+    versions, and whether ffmpeg (codec round-trips) and the `hearo` CLI (synthetic signals)
+    were there to use. (The synthetic generators' own code isn't hashed: bump `FORMAT` when
+    hearo-testkit's signals change.)"""
     blob = json.dumps(
         {
             "format": FORMAT,
@@ -283,6 +312,8 @@ def cache_key(manifest_sha: str, cfg: DataConfig, codecs: bool = True, synthetic
             "cfg": asdict(cfg),
             "codecs": codecs and bool(cfg.codecs),
             "synthetic": synthetic,
+            "code": code_fingerprint(),
+            "tools": tools or {},
         },
         sort_keys=True,
     )
@@ -300,7 +331,8 @@ def build(
     """Build (or reuse) the sets for `manifest`; returns the cache folder with `<split>.pkl`."""
     meta_path = manifest.parent / "meta.json"
     sha = json.loads(meta_path.read_text())["manifest_sha256"] if meta_path.exists() else _sha(manifest)
-    key = cache_key(sha, cfg, codecs=ffmpeg is not None, synthetic=hearo is not None)
+    tools = tool_versions(ffmpeg)
+    key = cache_key(sha, cfg, codecs=ffmpeg is not None, synthetic=hearo is not None, tools=tools)
     folder = out_root / key
     if (folder / "done.json").exists():
         log(f"✔ data cache {folder} is current")
@@ -315,7 +347,7 @@ def build(
             _item(c["stem"], "real", c["split"], audio[c["stem"]], c["regions"], c["rejected"], cfg, auto=c["auto"])
         )
     bank = [
-        cut_event(audio[c["stem"]], r["start_s"], r["end_s"])
+        (cut_event(audio[c["stem"]], r["start_s"], r["end_s"]), r["cls"])
         for c in clips
         if c["split"] == "train"
         for r in c["regions"]
@@ -326,17 +358,22 @@ def build(
     with tempfile.TemporaryDirectory() as tmp:
         synth_train, synth_test = [], []
         if hearo:
+            # Train takes only the synthetic *event* signals: the synthetic clean speech and
+            # music stay test-only, so their false-positive rates aren't measured on sounds
+            # the model was trained to stay quiet on (HANDOVER §9.1, no noise-source leakage).
             for seed in cfg.synthetic_train_seeds:
                 synth_train += [
-                    (f"synth{seed}:{n}", x, r) for n, x, r in synthetic(hearo, seed, cfg.synthetic_secs, Path(tmp))
+                    (f"synth{seed}:{n}", x, r)
+                    for n, x, r in synthetic(hearo, seed, cfg.synthetic_secs, Path(tmp))
+                    if n.startswith("events:")
                 ]
             for seed in cfg.synthetic_test_seeds:
                 synth_test += [
-                    (f"synth{seed}:{n}", x, r) for n, x, r in synthetic(hearo, seed, cfg.synthetic_secs, Path(tmp))
+                    (f"synth{seed}:{n}", x, r) for n, x, r in synthetic(hearo, seed, cfg.synthetic_test_secs, Path(tmp))
                 ]
         # Synthetic events join the bank too (more shapes than the few real ones so far), but
         # real events are drawn `real_event_share` of the time however many synthetic ones there are.
-        synth_bank = [cut_event(x, r["start_s"], r["end_s"]) for _, x, regs in synth_train for r in regs]
+        synth_bank = [(cut_event(x, r["start_s"], r["end_s"]), r["cls"]) for _, x, regs in synth_train for r in regs]
     n_real = len(bank)
     bank += synth_bank
     weights = None
@@ -379,6 +416,8 @@ def build(
         "config": asdict(cfg),
         "codecs": ffmpeg is not None,
         "synthetic": hearo is not None,
+        "code": code_fingerprint(),
+        "tools": tools,
         "bank_events": len(bank),
         "sets": {s: {"clips": len(v), "minutes": round(sum(i.seconds for i in v) / 60, 1)} for s, v in sets.items()},
     }

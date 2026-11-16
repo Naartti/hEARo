@@ -71,6 +71,7 @@ def test_cache_key_follows_codecs_and_synthetic_availability():
     keys = {ds.cache_key("a", cfg, c, s) for c in (True, False) for s in (True, False)}
     assert len(keys) == 4
     assert ds.cache_key("a", cfg) != ds.cache_key("b", cfg)
+    assert ds.cache_key("a", cfg, tools={"ffmpeg": "7"}) != ds.cache_key("a", cfg, tools={"ffmpeg": "8"})
 
 
 def test_mix_adds_labelled_events_at_the_requested_level():
@@ -78,8 +79,9 @@ def test_mix_adds_labelled_events_at_the_requested_level():
     bg = 0.05 * np.random.default_rng(2).standard_normal(8 * feat.SR).astype(np.float32)
     ev = ds.cut_event(np.ones(feat.SR, dtype=np.float32), 0.1, 0.12)
     cfg = ds.DataConfig(events_per_mix=(3, 3), esr_db=(0.0, 0.0))
-    out, regs = ds.mix(bg, [{"start_s": 4.0, "end_s": 4.02, "cls": "lip_smack"}], [ev], cfg, rng)
+    out, regs = ds.mix(bg, [{"start_s": 4.0, "end_s": 4.02, "cls": "lip_smack"}], [(ev, "mouth_click")], cfg, rng)
     assert len(regs) == 4
+    assert [r["cls"] for r in regs].count("mouth_click") == 3, "pasted events keep their class"
     for r in regs:
         if r["start_s"] == 4.0:
             continue
@@ -102,4 +104,6 @@ def test_codec_roundtrip_keeps_events_in_place(codec, kbps):
     x[feat.SR : feat.SR + 200] += 0.8
     y = ds.codec_roundtrip(x, codec, kbps, shutil.which("ffmpeg"))
     assert len(y) == len(x)
-    assert abs(int(np.argmax(np.abs(y))) - feat.SR) < feat.HOP  # within one frame
+    lags = range(-64, 65)
+    corr = [float(np.dot(x[100:-100], np.roll(y, -lag)[100:-100])) for lag in lags]
+    assert abs(lags[int(np.argmax(corr))]) <= 16, "realigned to within 0.5 ms"

@@ -17,18 +17,24 @@ scipy 1.18.1, soundfile 0.14.0, pyyaml 6.0.3; ffmpeg with libopus and aac.
 
 We run features at 32 kHz: 20 ms Hann window, 10 ms hop, 48 mel bands (50 Hz to 16 kHz),
 dB, and every frame strictly causal so Rust can compute the same frames (M8). The detector is
-two causal 1-D convolutions, a GRU and a linear head (≈ 50 k parameters). It gets a
-**30 ms lookahead**: output *t* labels frame *t − 3*, which fits inside de-smack's 40 ms and
-so costs no extra latency once it gates the repair. A **bidirectional teacher** of the same
-size trains on the same data as the offline upper bound, and later ranks auto-saved clips
-for review (it never deletes them). To get enough training data, each train clip gets 12
-mixes: train-day smacks plus synthetic ones (`hearo gen-signals`, train seeds; 60 % of draws
-are real) pasted in at −20 to +10 dB relative to the speech, then EQ tilt, gain, and Opus
-16/24/32 or AAC round-trips on 60 % of mixes, realigned by cross-correlation. Rejected spans
-weigh 4× as negatives. The checkpoint and threshold are picked on validation event F1.
-`just ml-eval` scores val and test with the exact rules of `hearo dataset eval` (ported and
-tested), puts the DSP de-smack next to the model on the same clips, adds Wilson intervals,
-and withholds test metrics while validation has no events.
+two causal 1-D convolutions, a GRU and a linear head; 32 channels and 32 GRU units with
+dropout 0.3 (≈ 14 k parameters; the first 64/64 run without dropout overfit after 500 steps).
+It gets a **30 ms lookahead**: output *t* labels frame *t − 3*, which fits inside de-smack's
+40 ms and so costs no extra latency once it gates the repair. A **bidirectional teacher** of
+the same width trains on the same data as the offline upper bound, and later ranks
+auto-saved clips for review (it never deletes them). To get enough training data, each train
+clip gets 12 mixes: train-day smacks plus synthetic smacks/clicks (`hearo gen-signals`, train
+seeds; 60 % of draws are real; each keeps its class) pasted in at −20 to +10 dB relative to
+the speech, then EQ tilt, gain, and Opus 16/24/32 or AAC round-trips on 60 % of mixes,
+realigned by cross-correlation. The synthetic clean speech and music are never trained on:
+they're test-only, 5 min per seed, for false positives per minute. Rejected spans of
+de-smack's catches weigh 4× as negatives (none fall on train days yet, so today this does
+nothing). The checkpoint and threshold are picked on validation event F1.
+`just ml-eval` scores validation with the rules of `hearo dataset eval` (ported and tested;
+close detections merge into one event on both sides), puts the DSP de-smack next to the
+model on the same clips with a note on how each split's clips were chosen, and adds Wilson
+intervals and Poisson upper bounds. Test is scored only on request (`TEST=1`), and the number
+of looks is counted per run.
 
 ## Alternatives considered
 
@@ -44,11 +50,18 @@ and withholds test metrics while validation has no events.
 
 ## Consequences (incl. how we'd know it was wrong)
 
-- `just ml-retrain` re-imports, rebuilds the data cache (keyed by manifest hash + data
-  config) and retrains both configs, so new review sessions feed straight in.
+- `just ml-retrain` re-imports, rebuilds the data cache (keyed by manifest hash, data
+  config, the data code and tool versions) and retrains both configs, so new review sessions
+  feed straight in.
 - With 17 test smacks the 95 % interval on recall is about ±20 points: until test passes
   50 events (warned in every report), runs are ranked on validation only.
-- Synthetic events are crude, and the synthetic test set measures them only loosely.
+- **The DSP comparison is biased by how clips were chosen.** Test clips are smacks de-smack
+  *missed* (its recall there is low by design); validation is mostly its own auto-saved
+  catches (its recall there is high). Neither is a fair head-to-head. That needs clips saved at
+  random times or continuous listening, and HANDOVER §9.3's "annoyance presses per hour".
+- Synthetic events come from the same generator as the synthetic training events, so the
+  synthetic F1 is in-distribution; the synthetic speech and music FP rates aren't.
+- Validation picks the checkpoint and threshold, so its numbers are optimistic.
 - Wrong if: the teacher can't beat the DSP de-smack on validation F1 once train has more
   than ~150 real events (then the features or the labels are the problem, not the amount of
   data), or the streaming detector trails the teacher by more than ~15 F1 points (then the

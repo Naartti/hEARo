@@ -89,7 +89,9 @@ def log_mel(x: np.ndarray) -> np.ndarray:
     idx = np.arange(WIN)[None, :] + HOP * np.arange(t)[:, None]
     frames = padded[idx] * _WINDOW
     spec = np.fft.rfft(frames, n=N_FFT, axis=1)
-    power = (spec.real**2 + spec.imag**2) / (WIN / 2) ** 2  # a full-scale sine ≈ 0 dB
+    # A full-scale sine peaks at -6 dB in its bin (the Hann window's coherent gain is 0.5),
+    # lower once averaged into a mel band. Rust must use the same scaling (M8 parity).
+    power = (spec.real**2 + spec.imag**2) / (WIN / 2) ** 2
     mel = power @ _FB.T
     return np.maximum(10.0 * np.log10(mel + 1e-12), LOG_FLOOR_DB).astype(np.float32)
 

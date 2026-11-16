@@ -111,6 +111,10 @@ xcode:
 
 # ── Release ──────────────────────────────────────────────────────────────────
 
+# Preview the next release's changelog section from changelog.d/ (docs/dev/RELEASING.md)
+changelog:
+    python3 scripts/changelog.py preview
+
 # Release build (bundle id io.github.naartti.hearo) → sign → DMG in dist/ (unnotarized; docs/user/INSTALL.md)
 release:
     scripts/build-app.sh release

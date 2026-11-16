@@ -437,13 +437,19 @@ See docs/HANDOVER.md §14; tasks get broken out here when the milestone starts.
       one command turns the reviewed snapshots into a training manifest that applies ADR 0017
       (by-day splits, auto clips never test data, mixing pool from training days only) and
       refuses to write one that leaks; tested end to end. `just ml-import-snapshots`
-      (`ml/hearo_ml/snapshots.py`, stdlib only, 9 tests); docs/ml/README.md *Using it*. On
-      this Mac (2026-11-16): 3 days → 2 train (38 clips, 39 events) / 1 test (12 clips, 13
-      events); the 180 auto clips are all on the test day and drop out until more days
-      arrive; pool 4 events. Delete-with-undo and processed A/B already existed (stale
-      notes fixed in DESIGN.md).
-  - [ ] Pool is small (4): ADR 0017's "< 150 clean events after two weeks" check — revisit
+      (`ml/hearo_ml/snapshots.py`, stdlib only, 23 tests); docs/ml/README.md *Using it*.
+      Split lock (`splits.lock.json`: a day never changes split), sessions across midnight
+      kept together, `--tz`, `meta.json` with manifest hashes, warnings for a small test
+      set / no validation. On this Mac (2026-11-16, scratch output — the human's first real
+      run creates the lock): 3 days → train 11-13 (21 clips, 22 events), val 11-15 (192
+      clips incl. the 180 auto, 54 events, 238 hard negatives), test 11-14 (17 clips, 17
+      events); pool 1 event. Delete-with-undo and processed A/B already existed (stale notes
+      fixed in DESIGN.md). Reviews: code review + ml-reviewer, all fixed except: per-speaker
+      groups (documented limit), Wilson intervals / "no test metrics without val" in eval
+      (no eval code yet — M7).
+  - [ ] Pool is tiny (1 event): ADR 0017's "< 150 clean events after two weeks" check — revisit
         when M7 starts; Freesound supplement if needed.
+  - [ ] M7 eval: report Wilson intervals; refuse test metrics while validation is empty.
 
 ## Log
 

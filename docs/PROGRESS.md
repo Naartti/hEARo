@@ -1,17 +1,15 @@
 # Progress
 
-The resume point for any session. Tick tasks as they land; add a one-line note per task.
+The resume point for any session: this file **plus every file in
+[progress.d/](progress.d/)** (work that landed since the last roll-up). Feature PRs never edit
+this file — they add `progress.d/<branch>.md` (parallel PRs editing the same lists here
+conflicted on every merge, 2026-11-16). A roll-up PR (`docs/rollup-<date>`, at milestone end
+or when progress.d/ grows long) ticks the tasks below from the fragments and deletes them.
 
 **Current milestone:** M4 — DSP modules (M0–M3 done apart from listed leftovers).
-**Now (owner's plan, 2026-11-15)** — one PR each, in order:
-
-1. Record the owner's answers (H1/H3/H5) + bundle ID `io.github.naartti.hearo`.
-2. Popover / Controls tab CPU (≈ 40 % of a core while open).
-3. Trustworthy training data: sidecars record enabled modules + live params, `dataset eval`
-   uses them; investigate the 11 `missed` snapshots; de-smack DSP review follow-ups.
-4. M6 as far as training needs: delete with undo, processed A/B in Review, a training export.
-
-Then M7/M8 (ML detector). DSP leftovers that need lookahead or measurement (de-ess fast "s",
+**Now (owner's plan, 2026-11-15):** steps 1–4 are PRs #14–#18 (bundle ID + answers, popover
+CPU, sidecar live settings + eval replay, de-smack follow-ups + missed clips, training
+manifest). Then M7/M8 (ML detector). DSP leftovers that need lookahead or measurement (de-ess fast "s",
 de-click targets) wait for the ML stage. Human: H3 tuning, H4 capture (docs/OPEN_QUESTIONS.md).
 
 Terminology (for docs/UI): *filled pause* = "uhm/öh" filler; *lip smack* = lips unsticking after a pause (sharp, bright, 5–30 ms);

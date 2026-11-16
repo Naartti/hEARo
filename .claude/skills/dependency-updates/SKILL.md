@@ -73,8 +73,9 @@ Dependabot's branch (it then stops rebasing it).
 **C — defer.** The fix is out of proportion now, or upstream is broken. On the open PR comment
 `@dependabot ignore <dependency> major version` (or `minor version`, or `@dependabot ignore
 <dependency>` for all versions) — name the dependency: the `this ...` forms don't work on
-grouped PRs. Add a line under *Dependency notes* in docs/PROGRESS.md Backlog (what, why, when
-to retry). Undo later with `@dependabot unignore <dependency>`.
+grouped PRs. Record it (what, why, when to retry) in `docs/progress.d/deps-<YYYY-MM-DD>.md`;
+the next roll-up moves it under *Dependency notes* in docs/PROGRESS.md Backlog (feature
+branches don't edit PROGRESS.md: docs/progress.d/README.md). Undo later with `@dependabot unignore <dependency>`.
 
 ## 3. Housekeeping
 

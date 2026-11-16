@@ -3,28 +3,13 @@
 All notable changes to hEARo are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project aims to follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) from 1.0 on. Every user-visible
-change adds a line under *Unreleased* in the same pull request; a release renames that
-section ([docs/dev/RELEASING.md](docs/dev/RELEASING.md)).
+change adds a fragment to [changelog.d/](changelog.d/) in the same pull request; a release
+folds them into a version section here ([docs/dev/RELEASING.md](docs/dev/RELEASING.md)).
 
 ## Unreleased
 
-### Changed
-
-- hEARo's bundle id is now `io.github.naartti.hearo` (was `dev.hearo.app`). After updating,
-  allow **System Audio Recording** once more and switch *Launch at login* back on if you used
-  it; your other settings carry over. Old *hEARo* entries may linger in System Settings →
-  Privacy & Security → Screen & System Audio Recording and in General → Login Items &
-  Extensions: remove them.
-- Snapshots now record which modules were on and their settings, and `hearo dataset eval`
-  replays the modules that ran before the scored one with those settings (older snapshots run
-  them at their defaults, and the report says how many).
-
-### Fixed
-
-- The open popover or Controls tab no longer costs a large share of a CPU core: the live
-  waveform now redraws on its own instead of refreshing every control 30 times a second.
-- De-smack: a loud smack no longer raises the bar for a quieter one right after it, so both
-  are turned down.
+Pending entries live in [changelog.d/](changelog.d/), one file per pull request, and are
+folded in here at release time (`just changelog` previews them).
 
 ## [0.2.0] - 2026-11-15
 

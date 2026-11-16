@@ -410,7 +410,8 @@ Deviations / not yet done:
 - Region classes are stored snake_case (`lip_smack`, `mouth_click`, `plosive`, `breath`,
   `filled_pause`, `other`), matching the `hearo dataset` proposal spelling.
 - Processed A/B is **B** (a toggle at the same position), not ⌥Space as first sketched.
-- Not yet: ⌫ on a clip to delete the snapshot (with undo), source app in the list
-  (sidecars don't record it; `source` is "cli"/"app"), Delete on a *hovered* (unselected)
-  region, unknown keys inside individual region objects (regions are rewritten as the three
-  keys above).
+- Delete a snapshot: ⌘⌫ / the trash button / right-click → Move to Trash (see the keyboard
+  flow above); "undo" is the Finder Trash, not ⌘Z.
+- Not yet: source app in the list (sidecars don't record it; `source` is "cli"/"app"), Delete
+  on a *hovered* (unselected) region, unknown keys inside individual region objects (regions
+  are rewritten as the three keys above).

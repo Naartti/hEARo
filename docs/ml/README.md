@@ -46,6 +46,17 @@ a verified smack) and **X** marks it a false positive (the sidecar's `rejected` 
 
 ### Using it
 
+`just ml-import-snapshots` (`hearo_ml.snapshots`) turns this Mac's reviewed snapshots into
+`ml/data/processed/snapshots/manifest.jsonl` (one line per clip: WAV path, day, split,
+regions, rejected spans) and `pool.jsonl` (mixing-pool events), both git-ignored, and prints a
+summary with the skipped clips by reason. It applies the rules below and refuses to write a
+manifest that breaks them (`check_no_leakage`). A day's split comes from a stable hash of the
+date (≈ 20 % test, 10 % validation), so it doesn't move as days are added; with only a few
+days the split is coarse (with three days, one whole day is test — and if that's the day
+of the auto-saved clips, they all drop out: they can be neither test nor training data).
+Pool events are lip smacks and mouth clicks from training days with no other region within
+100 ms and audio 50 ms either side ≥ 20 dB below the event.
+
 - **Splits by recording day/session**, never by clip: the same people recur across meetings,
   and one speaker's smacks in both train and test inflates every metric. A test enforces it.
 - **Test set:** held-out days of real, unmixed snapshots, including the overlapped smacks.

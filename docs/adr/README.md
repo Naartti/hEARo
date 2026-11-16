@@ -23,3 +23,4 @@ Template: [0000-template.md](0000-template.md). How to write one: `.claude/skill
 | [0017](0017-dataset-from-hotkey-snapshots.md) | Mouth-noise dataset from hotkey snapshots, not a recording session | accepted |
 | [0018](0018-auto-save-desmack-catches.md) | Auto-save de-smack catches (opt-in) | accepted |
 | [0019](0019-dependency-update-routine.md) | Dependency updates: weekly agent routine, agent merges green Dependabot bumps | accepted |
+| [0020](0020-phase-a-detector-pipeline.md) | Phase A detector: features, model, data and evaluation | accepted |

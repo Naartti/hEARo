@@ -59,6 +59,9 @@ class Event:
     start_s: float
     end_s: float
     cls: str
+    #: For a rejected span: the detector whose catch it was ("" = not recorded). Rejections
+    #: are per detector, as in `hearo dataset eval`.
+    module: str = ""
 
 
 @dataclass
@@ -82,7 +85,9 @@ def _events(items: object, default_cls: str, seconds: float = 0.0) -> list[Event
     out = []
     for r in items if isinstance(items, list) else []:
         try:
-            e = Event(float(r["start_s"]), float(r["end_s"]), str(r.get("class", default_cls)))
+            e = Event(
+                float(r["start_s"]), float(r["end_s"]), str(r.get("class", default_cls)), str(r.get("module") or "")
+            )
         except (KeyError, TypeError, ValueError, AttributeError):
             continue
         inside = seconds <= 0 or e.end_s <= seconds + 1e-3

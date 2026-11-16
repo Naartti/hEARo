@@ -209,6 +209,8 @@ def test_write_end_to_end(tmp_path: Path) -> None:
     train_days = {line["day"] for line in lines if line["split"] == "train"}
     assert pool and all(p["day"] in train_days for p in pool)
     assert summary["train"]["hard_negatives"] > 0
+    rejected = [r for line in lines for r in line["rejected"]]
+    assert rejected and all(r["module"] == "desmack" for r in rejected), "rejections keep their detector"
     assert summary["skipped_by_reason"]["not reviewed"] == 1
     assert summary["skipped_by_reason"]["auto-saved clip on a test day"] >= 1
     assert summary["skipped"] == sum(summary["skipped_by_reason"].values())

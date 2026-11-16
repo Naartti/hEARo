@@ -386,11 +386,33 @@ pub fn write_report(r: &Report, verbose: bool, out: &mut impl Write) -> std::io:
     Ok(())
 }
 
-/// `hearo dataset eval`: [`evaluate`] this Mac's snapshots and print the [`write_report`].
-pub fn run(module: &str, params: &[String], verbose: bool) -> Result<()> {
+/// One JSON line per scored clip: `{"stem", "detections": [{"start_s", "end_s"}]}`. The ML
+/// report (`hearo_ml.evaluate`) re-scores these per split, with the same rules as the model, so
+/// the DSP baseline and the model are compared on identical clips. Skipped clips go to `err`
+/// (stderr), so a caller learns which clips the JSON lacks.
+pub fn write_json(r: &Report, out: &mut impl Write, err: &mut impl Write) -> std::io::Result<()> {
+    for (stem, why) in &r.skipped {
+        writeln!(err, "⚠ {stem}: {why}, skipped")?;
+    }
+    for c in &r.clips {
+        let dets: Vec<serde_json::Value> =
+            c.dets.iter().map(|(s, _, _)| serde_json::json!({ "start_s": s.start, "end_s": s.end })).collect();
+        writeln!(out, "{}", serde_json::json!({ "stem": c.stem, "detections": dets }))?;
+    }
+    Ok(())
+}
+
+/// `hearo dataset eval`: [`evaluate`] this Mac's snapshots and print the [`write_report`]
+/// (or, with `json`, [`write_json`]).
+pub fn run(module: &str, params: &[String], verbose: bool, json: bool) -> Result<()> {
     let dir = snapshots::default_dir().context("HOME not set")?;
     let r = evaluate(&dir, module, params)?;
-    write_report(&r, verbose, &mut std::io::stdout().lock())?;
+    let out = &mut std::io::stdout().lock();
+    if json {
+        write_json(&r, out, &mut std::io::stderr().lock())?
+    } else {
+        write_report(&r, verbose, out)?
+    }
     Ok(())
 }
 
@@ -659,5 +681,29 @@ mod tests {
         assert!(long.contains("snapshot-1-auto:"), "{long}");
         assert!(long.contains("Rejected"), "{long}");
         assert!(long.contains("snapshot-3-missed"), "skipped clips are named: {long}");
+    }
+
+    #[test]
+    fn json_lists_every_scored_clip_and_its_detections() {
+        let (c, _) = fixture("json");
+        let r = evaluate(&c.0, "desmack", &[]).unwrap();
+        let (mut out, mut err) = (Vec::new(), Vec::new());
+        write_json(&r, &mut out, &mut err).unwrap();
+        let err = String::from_utf8(err).unwrap();
+        assert_eq!(err.lines().count(), r.skipped.len(), "{err}");
+        assert!(err.contains("snapshot-3-missed"), "skipped clips are named on stderr: {err}");
+        let lines: Vec<serde_json::Value> =
+            String::from_utf8(out).unwrap().lines().map(|l| serde_json::from_str(l).unwrap()).collect();
+        assert_eq!(lines.len(), r.clips.len());
+        for (line, clip) in lines.iter().zip(&r.clips) {
+            assert_eq!(line["stem"], clip.stem.as_str());
+            let dets = line["detections"].as_array().unwrap();
+            assert_eq!(dets.len(), clip.dets.len());
+            for (d, (span, _, _)) in dets.iter().zip(&clip.dets) {
+                assert_eq!(d["start_s"].as_f64().unwrap(), span.start);
+                assert_eq!(d["end_s"].as_f64().unwrap(), span.end);
+            }
+        }
+        assert!(lines.iter().any(|l| !l["detections"].as_array().unwrap().is_empty()), "fixture detects");
     }
 }

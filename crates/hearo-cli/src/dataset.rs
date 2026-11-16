@@ -45,6 +45,9 @@ pub enum Cmd {
         /// List every detection and missed region per clip.
         #[arg(long, short)]
         verbose: bool,
+        /// One JSON line per clip with its detections (for `just ml-eval`'s DSP baseline).
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -73,7 +76,7 @@ pub fn run(cmd: Cmd) -> Result<()> {
             println!("✔ exported {n} snapshots to {}", out.display());
         }
         Cmd::Propose { dry_run, modules } => propose(&dir, dry_run, &modules)?,
-        Cmd::Eval { module, params, verbose } => crate::eval::run(&module, &params, verbose)?,
+        Cmd::Eval { module, params, verbose, json } => crate::eval::run(&module, &params, verbose, json)?,
         Cmd::Import { archive } => {
             let r = snapshots::import(&archive, &dir).map_err(|e| anyhow::anyhow!("{e}"))?;
             println!(

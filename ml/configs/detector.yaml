@@ -1,0 +1,27 @@
+# Phase A streaming detector (HANDOVER §7.6): causal, 30 ms lookahead (inside de-smack's
+# 40 ms, ADR 0011), so it can gate the DSP repair live in M8.
+# 2026-11-16, first real run: 64/64 units without dropout overfit after ~500 steps (train
+# loss → 0, val F1 0.36 → 0.19). Smaller, dropout, shorter schedule, denser validation.
+name: detector
+data:
+  mixes_per_clip: 12
+  esr_db: [-20.0, 10.0]
+  hard_negative_weight: 4.0
+  seed: 0
+model:
+  channels: 32
+  hidden: 32
+  lookahead: 3
+  bidirectional: false
+  dropout: 0.3
+train:
+  steps: 1500
+  batch: 32
+  crop_frames: 400
+  lr: 0.002
+  weight_decay: 0.01
+  focal_gamma: 2.0
+  focal_alpha: 0.75
+  positive_crops: 0.5
+  eval_every: 100
+  seed: 0

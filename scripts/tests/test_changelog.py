@@ -86,30 +86,96 @@ def test_release_refuses_bad_fragments_and_a_duplicate_version(tmp_path: Path) -
 
 
 def git(root: Path, *args: str) -> None:
-    subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@e", *args], check=True, capture_output=True
+    )
 
 
-def test_feature_branches_may_not_edit_the_shared_files(tmp_path: Path) -> None:
+def git_repo(tmp_path: Path) -> Path:
+    """A repo with CHANGELOG.md and docs/PROGRESS.md on main, and a feature branch feat/x."""
     root = repo(tmp_path)
     (root / "docs").mkdir()
     (root / "docs" / "PROGRESS.md").write_text("# Progress\n")
     git(root, "init", "-q", "-b", "main")
-    git(root, "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-qam", "init", "--allow-empty")
     git(root, "add", "-A")
-    git(root, "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-qm", "base")
+    git(root, "commit", "-qm", "base")
     git(root, "switch", "-q", "-c", "feat/x")
     (root / "changelog.d" / "feat-x.md").write_text("### Added\n\n- X.\n")
-    (root / "src.txt").write_text("code\n")
     git(root, "add", "-A")
-    git(root, "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-qm", "x")
-    assert cl.shared_file_edits(root, "feat/x", "main") == []
+    git(root, "commit", "-qm", "x")
+    return root
+
+
+def test_feature_branches_may_not_edit_the_shared_files(tmp_path: Path) -> None:
+    root = git_repo(tmp_path)
+    assert cl.check(root, {}) == []
+    # Uncommitted edits count too: a green check must not let the commit hook through.
     (root / "CHANGELOG.md").write_text(CHANGELOG + "- sneaky\n")
+    assert [e.split(":")[0] for e in cl.check(root, {})] == ["CHANGELOG.md"]
     (root / "docs" / "PROGRESS.md").write_text("# Progress\n- [x] done\n")
-    git(root, "-c", "user.name=t", "-c", "user.email=t@e", "commit", "-qam", "y")
-    assert cl.shared_file_edits(root, "feat/x", "main") == ["CHANGELOG.md", "docs/PROGRESS.md"]
-    # Roll-up and release branches are where the shared files change.
-    assert cl.shared_file_edits(root, "docs/rollup-2026-11", "main") == []
-    assert cl.shared_file_edits(root, "chore/release-v0.3.0", "main") == []
-    # On main, or without a main to compare with (shallow CI checkout), there's nothing to judge.
-    assert cl.shared_file_edits(root, "main", "main") == []
-    assert cl.shared_file_edits(root, "feat/x", "no-such-ref") == []
+    git(root, "commit", "-qam", "y")
+    assert [e.split(":")[0] for e in cl.check(root, {})] == ["CHANGELOG.md", "docs/PROGRESS.md"]
+    # Roll-up and release branches are where the shared files change; main has nothing to judge.
+    for ok in ("docs/rollup-2026-11", "chore/release-v0.3.0"):
+        git(root, "branch", ok)
+        git(root, "switch", "-q", ok)
+        assert cl.check(root, {}) == [], ok
+    git(root, "switch", "-q", "main")
+    assert cl.check(root, {}) == []
+
+
+def test_local_runs_compare_with_origin_main_when_there_is_one(tmp_path: Path) -> None:
+    root = git_repo(tmp_path)
+    # origin/main moved on (a roll-up edited CHANGELOG.md) and the branch was rebased onto it,
+    # but local main is stale: the roll-up's edit is not this branch's.
+    git(root, "switch", "-q", "main")
+    (root / "CHANGELOG.md").write_text(CHANGELOG + "rolled up\n")
+    git(root, "commit", "-qam", "rollup")
+    git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    git(root, "reset", "-q", "--hard", "HEAD~1")
+    git(root, "switch", "-q", "feat/x")
+    git(root, "rebase", "-q", "origin/main")
+    assert cl.check(root, {}) == []
+
+
+def test_ci_compares_the_pr_merge_commit_with_its_first_parent(tmp_path: Path) -> None:
+    root = git_repo(tmp_path)
+    (root / "CHANGELOG.md").write_text(CHANGELOG + "- sneaky\n")
+    git(root, "commit", "-qam", "sneaky")
+    git(root, "switch", "-q", "--detach", "main")
+    git(root, "merge", "-q", "--no-ff", "feat/x", "-m", "merge")  # what actions/checkout gives a PR
+    env = {"GITHUB_HEAD_REF": "feat/x", "GITHUB_BASE_REF": "main"}
+    assert [e.split(":")[0] for e in cl.check(root, env)] == ["CHANGELOG.md"]
+    assert cl.check(root, {**env, "GITHUB_HEAD_REF": "docs/rollup-x"}) == []
+
+
+def test_ci_without_the_parent_commit_fails_loudly(tmp_path: Path) -> None:
+    root = repo(tmp_path)
+    git(root, "init", "-q", "-b", "main")
+    git(root, "add", "-A")
+    git(root, "commit", "-qm", "only")  # a depth-1 checkout: no HEAD^1
+    with pytest.raises(ValueError, match="fetch-depth"):
+        cl.check(root, {"GITHUB_HEAD_REF": "feat/x", "GITHUB_BASE_REF": "main"})
+
+
+def test_release_validates_version_and_date(tmp_path: Path) -> None:
+    root = repo(tmp_path)
+    (root / "changelog.d" / "x.md").write_text("### Fixed\n\n- x\n")
+    with pytest.raises(ValueError, match="no 'v'"):
+        cl.release(root, "v0.3.0", "2026-11-20")
+    with pytest.raises(ValueError, match="YYYY-MM-DD"):
+        cl.release(root, "0.3.0", "20-11-2026")
+    cl.release(root, "0.3.0-rc.1", "2026-11-20")
+    assert "## [0.3.0-rc.1] - 2026-11-20" in (root / "CHANGELOG.md").read_text()
+
+
+def test_bullets_keep_paragraphs_and_tab_indents() -> None:
+    parsed = cl.parse("### Fixed\n\n- First line\n\n  Second paragraph.\n- Next\n\tindented by a tab\n")
+    assert parsed == {"Fixed": ["- First line\n\n  Second paragraph.", "- Next\n    indented by a tab"]}
+
+
+def test_main_reports_problems_and_previews(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert cl.main(["changelog.py", "preview"]) == 0
+    assert cl.main(["changelog.py", "nonsense"]) == 2
+    assert cl.main(["changelog.py", "release", "v1", "x"]) == 1
+    assert "no 'v'" in capsys.readouterr().err

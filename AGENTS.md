@@ -6,7 +6,8 @@ The full brief is docs/HANDOVER.md; current state and next task are in docs/PROG
 
 ## Start of every session
 
-1. Read docs/PROGRESS.md (current milestone, next task) and `git log --oneline -20`.
+1. Read docs/PROGRESS.md (current milestone, next task), every file in docs/progress.d/ (what
+   landed since the last roll-up) and `git log --oneline -20`.
 2. Read the doc for the area you'll touch (docs/ARCHITECTURE.md, docs/DESIGN.md, docs/adr/).
 3. If tools seem off, run `just doctor`.
 
@@ -49,10 +50,16 @@ This is the default workflow for every request; the human never has to restate i
 5. **Test first, commit as you go.** Failing test → code → `just check` → commit. One logical
    change per commit, every commit green, docs in the same commit, body says *why*.
    A change a user would notice (app, engine behaviour, DSP results, CLI, install) also adds
-   a line under *Unreleased* in CHANGELOG.md in that commit, written for the user, not as a
-   commit subject. Refactors, tests, CI, tooling and agent docs need none; merged Dependabot
-   PRs stay manifest-only and the release adds their *Security* lines. What counts:
-   docs/dev/RELEASING.md.
+   its entry to `changelog.d/<branch>.md` (branch `/` → `-`) in that commit, written for the
+   user, not as a commit subject. Refactors, tests, CI, tooling and agent docs need none;
+   merged Dependabot PRs stay manifest-only and the release adds their *Security* lines. What
+   counts: docs/dev/RELEASING.md.
+   **Parallel PRs must not conflict:** a feature branch never edits CHANGELOG.md or
+   docs/PROGRESS.md (`just check` fails it). Task notes go to `docs/progress.d/<branch>.md`
+   (format: its README). Those two shared files change only on `docs/rollup-*` and
+   `chore/release-*` branches. Same idea anywhere else: prefer a new file per PR over
+   inserting into a list every PR touches. PRs #15–#17 (2026-11-16) all conflicted on
+   CHANGELOG.md *Unreleased* and neighbouring PROGRESS.md lines.
    Every new code path gets a test, CLI and tooling too: keep I/O at a thin edge (take a
    directory or a writer as an argument, so a test can pass a temp dir or a buffer) and test
    the logic end to end. Before pushing, `just patch-coverage` must pass — a red
@@ -60,11 +67,12 @@ This is the default workflow for every request; the human never has to restate i
    `hearo dataset eval` driver).
 6. **Review independently** before calling it done: the area reviewers for what you touched plus
    a general review of the whole branch diff (`main...HEAD`). Fix findings test-first, one
-   commit per fix, or note in PROGRESS.md why one was rejected.
+   commit per fix, or note in the branch's progress.d/ file why one was rejected.
 7. **Verify for real.** `just ci` green. UI changes: `just app` builds and launches; check what
    you can, then write a short *How to verify* checklist for the human.
-8. **Finish.** Check `git diff main...HEAD -- CHANGELOG.md`: every user-visible `feat`/`fix`
-   on the branch has its *Unreleased* line. Tick PROGRESS.md (in the branch),
+8. **Finish.** Check `git log main..HEAD` against `changelog.d/<branch>.md`: every
+   user-visible `feat`/`fix` on the branch has its line. Write `docs/progress.d/<branch>.md`
+   (the task, acceptance, what was done, decisions, review notes, follow-ups),
    `git push -u origin <branch>` (pre-push runs `just ci`), open a PR with `gh pr create` filled from `.github/PULL_REQUEST_TEMPLATE.md`
    (body ends with the How to verify checklist), and wait for `gh pr checks --watch` to go
    green; a red hosted run is fixed like a red local one. The human merges (rebase merge on
@@ -124,8 +132,9 @@ docs/                doc-as-code; deep-dives/ explain everything
 - Global bypass is bit-exact passthrough. Never leave the user in silence; fail to passthrough.
 - Test first. Never weaken or delete a test to get green. Golden updates need a reason in the commit.
 - Docs change in the same commit as the code they describe; user-visible changes get a
-  CHANGELOG.md *Unreleased* line in the same commit too.
-- Conventional Commits, one logical change each. Update docs/PROGRESS.md after each task.
+  `changelog.d/` fragment in the same commit too.
+- Conventional Commits, one logical change each. Record each task in docs/progress.d/ (never
+  PROGRESS.md or CHANGELOG.md on a feature branch: parallel PRs would conflict).
 - Verify crate/tool versions and APIs before using them; pin exact versions.
 - No network code, telemetry, secrets, audio recordings or large binaries in git.
 - Secrets live in `.env` / `.env.local` (git-ignored; template `.env.example`). Never print, log

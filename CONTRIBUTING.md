@@ -58,8 +58,9 @@ rebase-merged. More: [docs/dev/LOCAL_CI.md](docs/dev/LOCAL_CI.md).
   unprocessed audio, never silence.
 - **Docs change in the same commit** as the code they describe. Non-trivial design decisions
   get an ADR ([docs/adr/](docs/adr/README.md), template `0000-template.md`).
-- **Changelog.** A change users would notice adds a line under *Unreleased* in
-  [CHANGELOG.md](CHANGELOG.md), in the same commit. What counts and how releases are cut:
+- **Changelog.** A change users would notice adds a fragment, `changelog.d/<branch>.md`, in
+  the same commit; don't edit CHANGELOG.md itself (parallel PRs would conflict on it). Format:
+  [changelog.d/README.md](changelog.d/README.md). What counts and how releases are cut:
   [docs/dev/RELEASING.md](docs/dev/RELEASING.md).
 - **Dependencies:** pin exact versions, check the licence is in the `deny.toml` allow list
   (adding a licence needs an ADR), and verify the crate's API before using it.

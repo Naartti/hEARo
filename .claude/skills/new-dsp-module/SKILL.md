@@ -20,7 +20,7 @@ description: Step-by-step recipe for adding a hEARo DSP module (de-hum, de-ess, 
 5. **Green.** `just test-golden`, then `just check` (the RT-safety and stress tests pick the
    module up automatically through `modules::KEYS`).
 6. **Benchmark.** `just bench`: `module_alone/<key>` must leave the whole chain under the 5%
-   budget. Note the number in docs/PROGRESS.md.
+   budget. Note the number in the branch's `docs/progress.d/<branch>.md`.
 7. **CLI check.** `just signals` then `just cli process scratch/signals/<sig>.wav out.wav
    --modules <key> --report` and sanity-check the report.
 8. **FFI toggle + UI** (once M3 exists): expose enable + params through hearo-ffi; add the row
@@ -28,4 +28,5 @@ description: Step-by-step recipe for adding a hEARo DSP module (de-hum, de-ess, 
 9. **Deep dive.** Explain the algorithm for a musician (compare to familiar plugins), with a
    diagram and "experiments to try" using the CLI.
 10. **Review.** Run the `dsp-reviewer` and `rt-safety-reviewer` subagents; fix findings.
-11. **Commit** `feat(dsp): add <module>` with docs; tick docs/PROGRESS.md.
+11. **Commit** `feat(dsp): add <module>` with docs, a `changelog.d/` fragment and
+    `docs/progress.d/<branch>.md` (not PROGRESS.md or CHANGELOG.md: parallel PRs).

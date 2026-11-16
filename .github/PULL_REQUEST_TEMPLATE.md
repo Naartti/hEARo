@@ -11,8 +11,9 @@
       IOProc) does not allocate, lock, block, log or panic
 - [ ] Golden snapshot changes (if any) are explained in the commit message
 - [ ] Docs updated in the same commits as the code; ADR added for non-trivial decisions
-- [ ] User-visible change: a line under *Unreleased* in CHANGELOG.md (none needed for internal
-      changes; see docs/dev/RELEASING.md)
+- [ ] User-visible change: a fragment in `changelog.d/<branch>.md` (none needed for internal
+      changes; see docs/dev/RELEASING.md). CHANGELOG.md and docs/PROGRESS.md untouched (task
+      notes in `docs/progress.d/<branch>.md`), so parallel PRs don't conflict
 - [ ] Conventional Commits, one logical change each
 
 ## How to verify

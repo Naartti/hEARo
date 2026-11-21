@@ -55,7 +55,7 @@ jobs:
           if [[ "$green" == 0 ]]; then
             echo "::error::no successful CI run for $GITHUB_SHA yet; re-run this job once CI on main is green"; exit 1
           fi
-      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+      - uses: jdx/mise-action@b44d12e7d0d8ee7461bb893e1b1993500433185b # v5.2.7
         with:
           version: 2026.11.2
           install: true
